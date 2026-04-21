@@ -1,0 +1,29 @@
+import axios from 'axios';
+
+const API_URL = 'http://127.0.0.1:8003/evaluacion';
+
+export const obtenerPlan = async (id_nino) => {
+    const response = await axios.get(`${API_URL}/plan-evaluacion/${id_nino}`);
+    return response.data;
+};
+
+export const enviarAudioEvaluacion = async (formData) => {
+    const response = await axios.post(`${API_URL}/evaluar-fonema`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+};
+
+export const enviarValorFuzzy = async (datos) => {
+    const response = await axios.post(`${API_URL}/evaluar-manual`, datos);
+    return response.data;
+};
+
+export const iniciarEvaluacion = async (id_nino) => {
+    const formData = new FormData();
+    formData.append('id_nino', id_nino);
+    const response = await axios.post(`${API_URL}/iniciar-evaluacion`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+};

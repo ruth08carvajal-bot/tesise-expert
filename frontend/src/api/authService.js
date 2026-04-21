@@ -1,0 +1,32 @@
+import axios from 'axios';
+
+const API_URL = 'http://localhost:8003/auth';
+
+export const login = async (username, password) => {
+    try {
+        const response = await axios.post(`${API_URL}/login`, {
+            username,
+            password
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data.detail : "Error de conexión";
+    }
+};
+// registrar nuevo usuario (tutor)
+export const register = async (formData) => {
+    try {
+        const response = await axios.post(`${API_URL}/register`, {
+            nombre_completo: formData.nombre_completo,
+            username: formData.username,
+            password: formData.password,
+            email: formData.email,
+            celular: formData.celular,
+            ocupacion: formData.ocupacion,
+            zona: formData.zona
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data.detail : "Error al registrar";
+    }
+};
