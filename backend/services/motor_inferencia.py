@@ -18,7 +18,7 @@ class MotorInferencia:
     def buscar_reglas_para_meta(self, id_diag: int) -> List[BaseReglas]:
         reglas = []
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute("SELECT * FROM base_reglas WHERE id_diag = %s", (id_diag,))
             for row in cursor.fetchall():
                 reglas.append(BaseReglas(**row))
@@ -30,7 +30,7 @@ class MotorInferencia:
         Busca si el hecho viene de la Anamnesis o de la Evaluación (MFCC/Ejercicios).
         """
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(dictionary=True, buffered=True)
             
             # 1. Verificar el origen del hecho
             cursor.execute("SELECT instrumento_origen FROM base_hechos WHERE id_hecho = %s", (id_hecho,))
@@ -92,7 +92,7 @@ class MotorInferencia:
         diagnosticos_finales = []
         
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute("SELECT id_diag, nombre_diag FROM catalogo_diagnosticos")
             catalogos = cursor.fetchall()
 

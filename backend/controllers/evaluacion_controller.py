@@ -37,10 +37,11 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
 async def evaluar_fonema(
     id_nino: int = Form(...),
     id_evaluacion: int = Form(...),
-    fonema_objetivo: str = Form(...),
+    fonema_objetivo: str = Form(...), # Este es el id_hecho que viene del front
     audio: UploadFile = File(...)
 ):
     try:
+        # 1. Mapeo y procesamiento de audio
         nombre_fonema = mapear_id_a_nombre(fonema_objetivo)
         os.makedirs("data/temp_audios", exist_ok=True)
         
@@ -64,12 +65,24 @@ async def evaluar_fonema(
             except subprocess.CalledProcessError as e:
                 print(f"Error convirtiendo audio: {e}")
                 raise HTTPException(status_code=500, detail="Error procesando el audio")
-
+        # 2. Obtener resultado del MFCC
         porcentaje_similitud = mfcc_service.procesar_evaluacion(
             audio_nino_path=audio_path, 
             fonema=nombre_fonema, 
             id_ev=id_evaluacion
         )
+        # 3. ¡NUEVO!: PERSISTENCIA EN MEMORIA DE TRABAJO
+        # Esto es lo que el Motor de Inferencia leerá después
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor()
+            query_memoria = """
+                INSERT INTO memoria_trabajo (id_ev, id_hecho, valor_obtenido) 
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE valor_obtenido = %s
+            """
+            # Usamos fonema_objetivo porque es el ID numérico del hecho (H001, H002...)
+            cursor.execute(query_memoria, (id_evaluacion, fonema_objetivo, porcentaje_similitud, porcentaje_similitud))
+            conn.commit()
 
         if os.path.exists(audio_path):
             os.remove(audio_path)
@@ -77,6 +90,7 @@ async def evaluar_fonema(
         return {
             "status": "success",
             "similitud_detectada": round(porcentaje_similitud, 4),
+            "id_hecho": fonema_objetivo,
             "fonema_evaluado": nombre_fonema
         }
     except Exception as e:
@@ -99,30 +113,68 @@ async def evaluar_manual(datos: EvaluacionManual):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+#@router.get("/plan-evaluacion/{id_nino}")
+#async def obtener_plan_personalizado(id_nino: int):
+#    try:
+#        with db_admin.obtener_conexion() as conn:
+#            cursor = conn.cursor(dictionary=True)
+#            query_ana = "SELECT id_hecho FROM anamnesis_hechos WHERE id_nino = %s"
+#            cursor.execute(query_ana, (id_nino,))
+#            hechos_padre = [row['id_hecho'] for row in cursor.fetchall()]
+#
+#            if hechos_padre:
+#                format_strings = ','.join(['%s'] * len(hechos_padre))
+#                query_plan = f"""
+#                    SELECT DISTINCT e.* FROM catalogo_ejercicios e
+#                    LEFT JOIN base_reglas r ON e.id_ejercicio = r.id_ejercicio_sugerido
+#                    WHERE r.id_hecho IN ({format_strings})
+#                    OR e.nivel_dificultad = 'Bajo'
+#                """
+#                cursor.execute(query_plan, tuple(hechos_padre))
+#            else:
+#                cursor.execute("SELECT * FROM catalogo_ejercicios WHERE nivel_dificultad = 'Bajo'")
+#            
+#            ejercicios = cursor.fetchall()
+#            return {"id_nino": id_nino, "plan_evaluacion": ejercicios}
+#    except Exception as e:
+#        raise HTTPException(status_code=500, detail=str(e))
 @router.get("/plan-evaluacion/{id_nino}")
 async def obtener_plan_personalizado(id_nino: int):
     try:
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True)
-            query_ana = "SELECT id_hecho FROM anamnesis_hechos WHERE id_nino = %s"
-            cursor.execute(query_ana, (id_nino,))
-            hechos_padre = [row['id_hecho'] for row in cursor.fetchall()]
-
-            if hechos_padre:
-                format_strings = ','.join(['%s'] * len(hechos_padre))
-                query_plan = f"""
-                    SELECT DISTINCT e.* FROM catalogo_ejercicios e
-                    LEFT JOIN base_reglas r ON e.id_ejercicio = r.id_ejercicio_sugerido
-                    WHERE r.id_hecho IN ({format_strings})
-                    OR e.nivel_dificultad = 'Bajo'
-                """
-                cursor.execute(query_plan, tuple(hechos_padre))
-            else:
-                cursor.execute("SELECT * FROM catalogo_ejercicios WHERE nivel_dificultad = 'Bajo'")
+            cursor = conn.cursor(dictionary=True, buffered=True)
             
+            # CONSULTA HÍBRIDA:
+            # Parte 1: Ejercicios de CONTROL (Nivel Bajo para screening general)
+            # Parte 2: Ejercicios de SOSPECHA (Basados en la anamnesis del tutor)
+            query_plan = """
+                -- 1. Ejercicios de Control (Siempre se incluyen)
+                SELECT DISTINCT e.* FROM catalogo_ejercicios e
+                WHERE e.nivel_dificultad = 'Bajo'
+                
+                UNION
+                
+                -- 2. Ejercicios de Sospecha (Basados en la base de reglas + anamnesis)
+                SELECT DISTINCT e.*
+                FROM catalogo_ejercicios e
+                INNER JOIN base_reglas r ON e.id_ejercicio = r.id_ejercicio_sugerido
+                INNER JOIN anamnesis_hechos ah ON r.id_hecho = ah.id_hecho
+                WHERE ah.id_nino = %s
+            """
+            
+            cursor.execute(query_plan, (id_nino,))
             ejercicios = cursor.fetchall()
-            return {"id_nino": id_nino, "plan_evaluacion": ejercicios}
+            
+            # Log para que veas en la consola de Python qué está pasando
+            print(f"DEBUG: Plan generado para niño {id_nino}. Total ejercicios: {len(ejercicios)}")
+            
+            return {
+                "id_nino": id_nino, 
+                "total_ejercicios": len(ejercicios),
+                "plan_evaluacion": ejercicios
+            }
     except Exception as e:
+        print(f"ERROR en plan-evaluacion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
         
 def mapear_id_a_nombre(entrada):

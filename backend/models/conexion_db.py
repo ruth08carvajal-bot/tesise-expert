@@ -24,7 +24,10 @@ class Database:
                 password=self.password,
                 database=self.database,
                 charset="utf8mb4",
-                use_unicode=True
+                use_unicode=True,
+                # SOLUCIÓN: Esto permite realizar múltiples consultas sin que se bloqueen
+                get_warnings=True, 
+                raise_on_warnings=True
             )
             yield self.conexion # Entrega la conexión al controlador
         except Error as e:

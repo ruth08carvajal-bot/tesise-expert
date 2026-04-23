@@ -7,7 +7,7 @@ from models.conexion_db import db_admin
 
 class MFCCService:
     def __init__(self):
-        self.ALPHA = 7.5 
+        self.ALPHA = 15.0 
         self.SR = 16000
         self.PATH_PATRONES = "data/patrones"
         
@@ -51,28 +51,72 @@ class MFCCService:
         similitud = np.exp(-distancia / self.ALPHA)
         return float(similitud)
 #puedes que aqui este el error pot id_ev
+#    def procesar_evaluacion(self, audio_nino_path: str, fonema: str, id_ev: int):
+#        patron_path = os.path.join(self.PATH_PATRONES, f"{fonema}.npy")
+#        
+#        if not os.path.exists(patron_path):
+#            print(f"Error: Patrón no encontrado en {patron_path}")
+#            return 0.0
+#
+#        v_patron = np.load(patron_path)
+#        v_nino = self.extraer_vector_mfcc(audio_nino_path)
+#        
+#        fc_obtenido = self.calcular_similitud_difusa(v_nino, v_patron)
+#        id_hecho = self.MAPEO_FONEMAS.get(fonema, 0)
+#
+#        if id_hecho > 0:
+#            with db_admin.obtener_conexion() as conn:
+#                cursor = conn.cursor()
+#                query = """
+#                    INSERT INTO memoria_trabajo (id_ev, id_hecho, valor_obtenido) 
+#                    VALUES (%s, %s, %s)
+#                    ON DUPLICATE KEY UPDATE valor_obtenido = %s
+#                """
+#                cursor.execute(query, (id_ev, id_hecho, fc_obtenido, fc_obtenido))
+#                conn.commit()
+#        
+#        return fc_obtenido
     def procesar_evaluacion(self, audio_nino_path: str, fonema: str, id_ev: int):
-        patron_path = os.path.join(self.PATH_PATRONES, f"{fonema}.npy")
-        
-        if not os.path.exists(patron_path):
-            print(f"Error: Patrón no encontrado en {patron_path}")
-            return 0.0
+            # 1. Intentar cargar el .npy (vector ya procesado) o el .wav (audio crudo)
+            patron_npy = os.path.join(self.PATH_PATRONES, f"{fonema}.npy")
+            patron_wav = os.path.join(self.PATH_PATRONES, f"{fonema}.wav")
+            
+            v_patron = None
+            
+            if os.path.exists(patron_npy):
+                v_patron = np.load(patron_npy)
+            elif os.path.exists(patron_wav):
+                v_patron = self.extraer_vector_mfcc(patron_wav)
+            else:
+                print(f"CRÍTICO: No existe patrón para [{fonema}] en .npy ni .wav")
+                return 0.0
 
-        v_patron = np.load(patron_path)
-        v_nino = self.extraer_vector_mfcc(audio_nino_path)
-        
-        fc_obtenido = self.calcular_similitud_difusa(v_nino, v_patron)
-        id_hecho = self.MAPEO_FONEMAS.get(fonema, 0)
+            # 2. Extraer vector del niño
+            v_nino = self.extraer_vector_mfcc(audio_nino_path)
+            
+            # 3. Cálculo de Similitud
+            fc_obtenido = self.calcular_similitud_difusa(v_nino, v_patron)
+            
+            # 4. CORRECCIÓN DEL MAPEO: 
+            # Si 'fonema' ya es un número (ej. "1"), lo usamos directamente.
+            # Si es una letra (ej. "r"), usamos el diccionario.
+            if fonema.isdigit():
+                id_hecho = int(fonema)
+            else:
+                id_hecho = self.MAPEO_FONEMAS.get(fonema, 0)
 
-        if id_hecho > 0:
-            with db_admin.obtener_conexion() as conn:
-                cursor = conn.cursor()
-                query = """
-                    INSERT INTO memoria_trabajo (id_ev, id_hecho, valor_obtenido) 
-                    VALUES (%s, %s, %s)
-                    ON DUPLICATE KEY UPDATE valor_obtenido = %s
-                """
-                cursor.execute(query, (id_ev, id_hecho, fc_obtenido, fc_obtenido))
-                conn.commit()
-        
-        return fc_obtenido
+            print(f"DEBUG MFCC: Fonema={fonema}, ID_Hecho={id_hecho}, Similitud={fc_obtenido}")
+
+            if id_hecho > 0:
+                with db_admin.obtener_conexion() as conn:
+                    cursor = conn.cursor(buffered=True)
+                    query = """
+                        INSERT INTO memoria_trabajo (id_ev, id_hecho, valor_obtenido) 
+                        VALUES (%s, %s, %s)
+                        ON DUPLICATE KEY UPDATE valor_obtenido = %s
+                    """
+                    cursor.execute(query, (id_ev, id_hecho, fc_obtenido, fc_obtenido))
+                    conn.commit()
+                    cursor.close()
+            
+            return fc_obtenido
