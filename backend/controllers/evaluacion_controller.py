@@ -16,7 +16,18 @@ class EvaluacionManual(BaseModel):
     id_evaluacion: int
     id_hecho: int
     valor: float
-
+    #id_tipo_evidencia: Optional[int] = None nuevo 23/04/26, lo dejamos fijo en el endpoint para no complicar el front con esta lógica
+def obtener_id_tipo_evidencia(nombre_tipo: str):
+    with db_admin.obtener_conexion() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id_tipo FROM tipo_evidencia WHERE nombre = %s",
+            (nombre_tipo,)
+        )
+        result = cursor.fetchone()
+        if not result:
+            raise Exception(f"Tipo de evidencia '{nombre_tipo}' no existe")
+        return result[0]
 @router.post("/iniciar-evaluacion")
 async def iniciar_evaluacion(id_nino: int = Form(...)):
     try:
@@ -71,18 +82,33 @@ async def evaluar_fonema(
             fonema=nombre_fonema, 
             id_ev=id_evaluacion
         )
+        # nuevo: actualizar rendimiento histórico
+        actualizar_rendimiento(id_nino, int(fonema_objetivo), porcentaje_similitud)
         # 3. ¡NUEVO!: PERSISTENCIA EN MEMORIA DE TRABAJO
-        # Esto es lo que el Motor de Inferencia leerá después
+                # CORRECCIÓN: ahora obtenemos id_tipo_evidencia dinámicamente para no hardcodear el '4' y que sea más flexible a cambios futuros 23/04/26
         with db_admin.obtener_conexion() as conn:
             cursor = conn.cursor()
+
+            id_tipo = obtener_id_tipo_evidencia("MFCC")
+
             query_memoria = """
-                INSERT INTO memoria_trabajo (id_ev, id_hecho, valor_obtenido) 
-                VALUES (%s, %s, %s)
+                INSERT INTO memoria_trabajo 
+                (id_ev, id_hecho, valor_obtenido, id_tipo_evidencia, confiabilidad, fuente) 
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE valor_obtenido = %s
             """
-            # Usamos fonema_objetivo porque es el ID numérico del hecho (H001, H002...)
-            cursor.execute(query_memoria, (id_evaluacion, fonema_objetivo, porcentaje_similitud, porcentaje_similitud))
-            conn.commit()
+
+            cursor.execute(query_memoria, (
+                id_evaluacion,
+                fonema_objetivo,
+                porcentaje_similitud,
+                id_tipo,
+                0.9,            # confiabilidad MFCC
+                "MFCC",
+                porcentaje_similitud
+            ))
+
+            conn.commit() # fin de la corrección para obtener id_tipo_evidencia dinámicamente
 
         if os.path.exists(audio_path):
             os.remove(audio_path)
@@ -97,84 +123,76 @@ async def evaluar_fonema(
         print(f"DEBUG ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# CORRECCIÓN: ahora el endpoint de evaluación manual también actualiza el rendimiento histórico y obtiene id_tipo_evidencia dinámicamente para mantener consistencia con el endpoint de evaluación automática 23/04/26
 @router.post("/evaluar-manual")
 async def evaluar_manual(datos: EvaluacionManual):
     try:
+        actualizar_rendimiento(datos.id_nino, datos.id_hecho, datos.valor)
+
         with db_admin.obtener_conexion() as conn:
             cursor = conn.cursor()
+
+            # Puedes decidir si esto es FUZZY o OTRO
+            # Aquí lo pongo como OTRO (evaluación directa)
+            id_tipo = obtener_id_tipo_evidencia("OTRO")
+
             query = """
-                INSERT INTO memoria_trabajo (id_ev, id_hecho, valor_obtenido) 
-                VALUES (%s, %s, %s)
+                INSERT INTO memoria_trabajo 
+                (id_ev, id_hecho, valor_obtenido, id_tipo_evidencia, confiabilidad, fuente) 
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE valor_obtenido = %s
             """
-            cursor.execute(query, (datos.id_evaluacion, datos.id_hecho, datos.valor, datos.valor))
+
+            cursor.execute(query, (
+                datos.id_evaluacion,
+                datos.id_hecho,
+                datos.valor,
+                id_tipo,
+                1.0,            # máxima confiabilidad
+                "MANUAL",
+                datos.valor
+            ))
+
             conn.commit()
+
         return {"status": "success", "similitud_detectada": datos.valor}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-#@router.get("/plan-evaluacion/{id_nino}")
-#async def obtener_plan_personalizado(id_nino: int):
-#    try:
-#        with db_admin.obtener_conexion() as conn:
-#            cursor = conn.cursor(dictionary=True)
-#            query_ana = "SELECT id_hecho FROM anamnesis_hechos WHERE id_nino = %s"
-#            cursor.execute(query_ana, (id_nino,))
-#            hechos_padre = [row['id_hecho'] for row in cursor.fetchall()]
-#
-#            if hechos_padre:
-#                format_strings = ','.join(['%s'] * len(hechos_padre))
-#                query_plan = f"""
-#                    SELECT DISTINCT e.* FROM catalogo_ejercicios e
-#                    LEFT JOIN base_reglas r ON e.id_ejercicio = r.id_ejercicio_sugerido
-#                    WHERE r.id_hecho IN ({format_strings})
-#                    OR e.nivel_dificultad = 'Bajo'
-#                """
-#                cursor.execute(query_plan, tuple(hechos_padre))
-#            else:
-#                cursor.execute("SELECT * FROM catalogo_ejercicios WHERE nivel_dificultad = 'Bajo'")
-#            
-#            ejercicios = cursor.fetchall()
-#            return {"id_nino": id_nino, "plan_evaluacion": ejercicios}
-#    except Exception as e:
-#        raise HTTPException(status_code=500, detail=str(e))
+# NUEVO ENDPOINT PARA OBTENER PLAN DE EJERCICIOS PERSONALIZADO BASADO EN RENDIMIENTO HISTÓRICO Y HECHOS OBJETIVO DE LOS EJERCICIOS 23/04/26
 @router.get("/plan-evaluacion/{id_nino}")
 async def obtener_plan_personalizado(id_nino: int):
     try:
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True, buffered=True)
-            
-            # CONSULTA HÍBRIDA:
-            # Parte 1: Ejercicios de CONTROL (Nivel Bajo para screening general)
-            # Parte 2: Ejercicios de SOSPECHA (Basados en la anamnesis del tutor)
-            query_plan = """
-                -- 1. Ejercicios de Control (Siempre se incluyen)
-                SELECT DISTINCT e.* FROM catalogo_ejercicios e
-                WHERE e.nivel_dificultad = 'Bajo'
-                
-                UNION
-                
-                -- 2. Ejercicios de Sospecha (Basados en la base de reglas + anamnesis)
-                SELECT DISTINCT e.*
-                FROM catalogo_ejercicios e
-                INNER JOIN base_reglas r ON e.id_ejercicio = r.id_ejercicio_sugerido
-                INNER JOIN anamnesis_hechos ah ON r.id_hecho = ah.id_hecho
-                WHERE ah.id_nino = %s
+            cursor = conn.cursor(dictionary=True)
+
+            query = """
+            SELECT 
+                e.*,
+                COALESCE(rh.promedio, 0) as rendimiento
+            FROM catalogo_ejercicios e
+            LEFT JOIN rendimiento_hecho rh 
+                ON e.id_hecho_objetivo = rh.id_hecho 
+                AND rh.id_nino = %s
+            ORDER BY
+                CASE
+                    WHEN rh.promedio IS NULL THEN 1   -- Nunca evaluado (exploración)
+                    WHEN rh.promedio < 0.4 THEN 2     -- Débil (zona de desarrollo)
+                    WHEN rh.promedio BETWEEN 0.4 AND 0.7 THEN 3 -- Zona óptima ZPD
+                    ELSE 4 -- Dominado
+                END,
+                rh.promedio ASC
             """
-            
-            cursor.execute(query_plan, (id_nino,))
+
+            cursor.execute(query, (id_nino,))
             ejercicios = cursor.fetchall()
-            
-            # Log para que veas en la consola de Python qué está pasando
-            print(f"DEBUG: Plan generado para niño {id_nino}. Total ejercicios: {len(ejercicios)}")
-            
+
             return {
-                "id_nino": id_nino, 
-                "total_ejercicios": len(ejercicios),
-                "plan_evaluacion": ejercicios
+                "id_nino": id_nino,
+                "plan_adaptativo": ejercicios
             }
+
     except Exception as e:
-        print(f"ERROR en plan-evaluacion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
         
 def mapear_id_a_nombre(entrada):
@@ -193,3 +211,41 @@ async def ejecutar_diagnostico(id_nino: int, id_evaluacion: int):
     except Exception as e:
         print(f"Error en motor: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+# nueva función para actualizar rendimiento después de cada evaluación
+def actualizar_rendimiento(id_nino, id_hecho, nuevo_valor):
+    with db_admin.obtener_conexion() as conn:
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT promedio, intentos FROM rendimiento_hecho
+            WHERE id_nino = %s AND id_hecho = %s
+        """, (id_nino, id_hecho))
+        
+        row = cursor.fetchone()
+
+        if row:
+            promedio_actual = row['promedio']
+            intentos = row['intentos'] + 1
+
+            nuevo_promedio = ((promedio_actual * row['intentos']) + nuevo_valor) / intentos
+
+            #tendencia = "Sube" if nuevo_valor > promedio_actual else "Baja"
+            if nuevo_valor > promedio_actual:
+                tendencia = "Sube"
+            elif nuevo_valor < promedio_actual:
+                tendencia = "Baja"
+            else:
+                tendencia = "Estable"
+
+            cursor.execute("""
+                UPDATE rendimiento_hecho
+                SET promedio=%s, intentos=%s, tendencia=%s
+                WHERE id_nino=%s AND id_hecho=%s
+            """, (nuevo_promedio, intentos, tendencia, id_nino, id_hecho))
+        else:
+            cursor.execute("""
+                INSERT INTO rendimiento_hecho (id_nino, id_hecho, promedio, intentos, tendencia)
+                VALUES (%s,%s,%s,1,'Estable')
+            """, (id_nino, id_hecho, nuevo_valor))
+
+        conn.commit()

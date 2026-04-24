@@ -4,7 +4,9 @@ import { iniciarEvaluacion } from '../api/evaluacionService';
 
 const EvaluacionPage = () => {
     // Estos IDs normalmente vienen del Login o de la selección del niño
-    const idNino = 1;
+    //const idNino = 1;
+    // nuevo: obtenemos idNino del niño seleccionado en el dashboard 23/04/26
+    const idNino = selectedNino?.id_nino;
     const [idEvaluacion, setIdEvaluacion] = useState(null);
     const [loading, setLoading] = useState(true);
 

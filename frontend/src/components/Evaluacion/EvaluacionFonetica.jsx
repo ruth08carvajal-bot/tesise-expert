@@ -9,19 +9,38 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
     const [resultado, setResultado] = useState(null);
     const [valorFuzzy, setValorFuzzy] = useState(0.5);
 
+        // carga de ejercicios con nuevo formato 23/04/26
+    const [error, setError] = useState(null);
+
     useEffect(() => {
         const cargarDatos = async () => {
             try {
+                console.log("🔍 Cargando plan para niño:", idNino);
+
                 const data = await obtenerPlan(idNino);
-                setEjercicios(data.plan_evaluacion || []);
+
+                console.log("📦 Respuesta backend:", data);
+               // NUEVO: el backend ahora devuelve un plan adaptativo con formato actualizado 23/04/26
+               if (!data || !data.plan_adaptativo) {
+                    setError("El backend no devolvió plan_adaptativo");
+                    setEjercicios([]);
+                    return;
+                }
+
+                setEjercicios(data.plan_adaptativo);
+
+                //setEjercicios(data.plan_evaluacion);
+                // NUEVO: ahora el backend devuelve un plan adaptativo con formato actualizado 23/04/26
+                setEjercicios(data.plan_adaptativo || []);
+
             } catch (err) { 
-                console.error("Error al cargar plan:", err); 
+                console.error("❌ Error al cargar plan:", err);
+                setError("Error al conectar con el servidor");
             }
         };
-        if (idNino) cargarDatos();
-    }, [idNino]);
 
-    const ejercicioActual = ejercicios[indiceActual];
+        if (idNino) cargarDatos();
+    }, [idNino]);// hasta aquí nueva carga de ejercicios con formato actualizado
 
     const iniciarGrabacion = async () => {
         try {
@@ -113,8 +132,19 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
             onFinish(); 
         }
     };
+    // NUEVO: manejo de errores y estado de carga con mensajes más claros
+    if (error) {
+        return <p style={{color: 'red'}}>{error}</p>;
+    }
 
-    if (ejercicios.length === 0) return <p>Cargando ejercicios del sistema experto...</p>;
+    if (ejercicios.length === 0) {
+        return <p>Cargando ejercicios del sistema experto...</p>;
+    } //fin de nuevo manejo de errores y estado de carga
+    const ejercicioActual = ejercicios[indiceActual];
+    //inicio de nuevo manejo de errores y estado de carga para ejercicios
+    if (!ejercicioActual) {
+        return <p>No hay ejercicios disponibles</p>;
+    }//fin de nuevo manejo de errores y estado de carga para ejercicios
 
     return (
         <div style={styles.container}>

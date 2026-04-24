@@ -23,70 +23,128 @@ class MotorInferencia:
             for row in cursor.fetchall():
                 reglas.append(BaseReglas(**row))
         return reglas
-
-    def obtener_certeza_hecho(self, id_nino: int, id_ev: int, id_hecho: int) -> float:
-        """
-        BUSCADOR INTELIGENTE DE EVIDENCIA:
-        Busca si el hecho viene de la Anamnesis o de la Evaluación (MFCC/Ejercicios).
-        """
+    # nuevo metodo de reglas compuestas 23/04/26
+    def obtener_reglas_compuestas(self, id_diag: int):
         with db_admin.obtener_conexion() as conn:
             cursor = conn.cursor(dictionary=True, buffered=True)
             
-            # 1. Verificar el origen del hecho
-            cursor.execute("SELECT instrumento_origen FROM base_hechos WHERE id_hecho = %s", (id_hecho,))
-            info_hecho = cursor.fetchone()
-            
-            if not info_hecho:
-                return 0.0
+            cursor.execute("SELECT * FROM reglas_compuestas WHERE id_diag = %s", (id_diag,))
+            reglas = cursor.fetchall()
 
-            origen = info_hecho['instrumento_origen']
+            resultado = []
+            for r in reglas:
+                cursor.execute("SELECT * FROM regla_detalle WHERE id_regla = %s", (r['id_regla'],))
+                detalles = cursor.fetchall()
+                resultado.append((r, detalles))
 
-            # 2. Hechos provenientes del entorno familiar/anamnesis
-            if origen in ['Tutor', 'Social']:
-                cursor.execute(
-                    "SELECT 1.0 as valor FROM anamnesis_hechos WHERE id_nino = %s AND id_hecho = %s",
-                    (id_nino, id_hecho)
-                )
-                res = cursor.fetchone()
-                return float(res['valor']) if res else 0.0
+            return resultado
+    def evaluar_regla_compuesta(self, id_nino, id_ev, regla, detalles):
+        suma = 0.0
 
-            # 3. Hechos provenientes de la evaluación técnica (MFCC, TAR, etc.)
-            else:
-                cursor.execute(
-                    "SELECT valor_obtenido FROM memoria_trabajo WHERE id_ev = %s AND id_hecho = %s",
-                    (id_ev, id_hecho)
-                )
-                res = cursor.fetchone()
-                return float(res['valor_obtenido']) if res else 0.0
+        for d in detalles:
+            valor_hecho = self.obtener_certeza_hecho(id_nino, id_ev, d['id_hecho'])
 
+            cumple = False
+            if d['operador'] == '>':
+                cumple = valor_hecho > d['valor']
+            elif d['operador'] == '<':
+                cumple = valor_hecho < d['valor']
+            elif d['operador'] == '=':
+                cumple = valor_hecho == d['valor']
+
+            if cumple:
+                suma += d['peso'] * valor_hecho
+
+        return suma
+    # nueva función 23/04/26 para obtener certeza de un hecho específico considerando confiabilidad
+    def obtener_certeza_hecho(self, id_nino: int, id_ev: int, id_hecho: int) -> float:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True, buffered=True)
+
+            cursor.execute("""
+                SELECT valor_obtenido, confiabilidad
+                FROM memoria_trabajo 
+                WHERE id_ev = %s AND id_hecho = %s
+            """, (id_ev, id_hecho))
+
+            res = cursor.fetchone()
+            if res:
+                #return float(res['valor_obtenido']) * float(res.get('confiabilidad', 1.0))
+                #cambios para considerar confiabilidad 23/04/26
+                valor = float(res['valor_obtenido'])
+                confiabilidad = float(res.get('confiabilidad', 1.0))
+                return valor * confiabilidad
+            return 0.0
+
+            # fallback anamnesis
+            cursor.execute("""
+                SELECT 1.0 as valor
+                FROM anamnesis_hechos 
+                WHERE id_nino = %s AND id_hecho = %s
+            """, (id_nino, id_hecho))
+
+            res = cursor.fetchone()
+            return float(res['valor']) if res else 0.0
+    #nueva funcion 23/04/26 para obtener rendimiento histórico de un hecho específico
+    def obtener_rendimiento_hecho(self, id_nino: int, id_hecho: int) -> float:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT promedio FROM rendimiento_hecho
+                WHERE id_nino = %s AND id_hecho = %s
+            """, (id_nino, id_hecho))
+            row = cursor.fetchone()
+            return float(row['promedio']) if row else 0.0
+
+   
+    # nueva función de inferencia con integración total de reglas compuestas y ajuste por confiabilidad 23/04/26
     def inferir_backward(self, id_nino: int, id_ev: int, id_meta: int) -> float:
-        """
-        IMPLEMENTACIÓN DE ENCADENAMIENTO HACIA ATRÁS (BACKWARD CHAINING).
-        Integración de contexto Anamnesis + Evaluación Directa.
-        """
+        fc_total = 0.0
+
+        # ============================================
+        # 1. REGLAS COMPUESTAS (nivel clínico experto)
+        # ============================================
+        reglas_compuestas = self.obtener_reglas_compuestas(id_meta)
+
+        for regla, detalles in reglas_compuestas:
+            fc_compuesta = self.evaluar_regla_compuesta(id_nino, id_ev, regla, detalles)
+
+            if fc_compuesta >= regla['umbral']:
+                self.trazas_actuales.append(
+                    f"Regla compuesta activada → FC={fc_compuesta:.2f} (umbral={regla['umbral']})"
+                )
+
+                fc_total = CertezaService.combinar_mycin(fc_total, fc_compuesta)
+
+        # ============================================
+        # 2. REGLAS CLÁSICAS (MYCIN)
+        # ============================================
         reglas = self.buscar_reglas_para_meta(id_meta)
-        fc_acumulado = 0.0
 
         for regla in reglas:
-            fc_hecho = self.obtener_certeza_hecho(id_nino, id_ev, regla.id_hecho)
+            fc_actual = self.obtener_certeza_hecho(id_nino, id_ev, regla.id_hecho)
+            fc_hist = self.obtener_rendimiento_hecho(id_nino, regla.id_hecho)
+
+            # 🔥 COMBINACIÓN ADAPTATIVA (historial + actual)
+            fc_hecho = (0.7 * fc_actual) + (0.3 * fc_hist)
+
+            # 🔥 AJUSTE POR CONFIABILIDAD (nuevo)
+            confiabilidad = self.obtener_confiabilidad(id_ev, regla.id_hecho)
+            fc_hecho = fc_hecho * confiabilidad
 
             if fc_hecho > 0:
-                # Propagación (Ec. 2.8)
-                fc_concl_regla = CertezaService.propagar_condiciones(
-                    [fc_hecho], 
-                    regla.weight_certeza if hasattr(regla, 'weight_certeza') else regla.peso_certeza
-                )
-                
-                # Combinación MYCIN (Ec. 2.7)
-                fc_viejo = fc_acumulado
-                fc_acumulado = CertezaService.combinar_mycin(fc_viejo, fc_concl_regla)
-                
-                self.trazas_actuales.append(
-                    f"Hecho H{regla.id_hecho} confirmado (FC={fc_hecho:.2f}). "
-                    f"Certeza combinada: {fc_acumulado:.4f}"
+                fc_regla = CertezaService.propagar_condiciones(
+                    [fc_hecho],
+                    regla.peso_certeza
                 )
 
-        return fc_acumulado
+                fc_total = CertezaService.combinar_mycin(fc_total, fc_regla)
+
+                self.trazas_actuales.append(
+                    f"Hecho H{regla.id_hecho} → FC={fc_hecho:.2f} (conf={confiabilidad}) → Total={fc_total:.4f}"
+                )
+
+        return fc_total
 
     def ejecutar_diagnostico_completo(self, id_nino: int, id_ev: int) -> List[ResultadoDiagnostico]:
         diagnosticos_finales = []
@@ -110,3 +168,69 @@ class MotorInferencia:
 
         # Ordenar por mayor certeza
         return sorted(diagnosticos_finales, key=lambda x: x.fc_total, reverse=True)
+    # nueva función 23/04/26 para evaluar reglas compuestas de un diagnóstico específico
+    def evaluar_reglas_compuestas(self, id_nino: int, id_ev: int, id_diag: int) -> float:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+
+            # Obtener reglas compuestas del diagnóstico
+            cursor.execute("""
+                SELECT * FROM reglas_compuestas 
+                WHERE id_diag = %s
+            """, (id_diag,))
+            reglas = cursor.fetchall()
+
+            fc_total = 0.0
+
+            for regla in reglas:
+                id_regla = regla['id_regla']
+                umbral = regla['umbral']
+
+                # Obtener condiciones
+                cursor.execute("""
+                    SELECT * FROM regla_detalle 
+                    WHERE id_regla = %s
+                """, (id_regla,))
+                detalles = cursor.fetchall()
+
+                suma_ponderada = 0.0
+                suma_pesos = 0.0
+
+                for d in detalles:
+                    fc = self.obtener_certeza_hecho(id_nino, id_ev, d['id_hecho'])
+
+                    # Evaluación de operador
+                    cumple = False
+                    if d['operador'] == '>':
+                        cumple = fc > d['valor']
+                    elif d['operador'] == '<':
+                        cumple = fc < d['valor']
+                    elif d['operador'] == '=':
+                        cumple = fc == d['valor']
+
+                    if cumple:
+                        suma_ponderada += fc * d['peso']
+                        suma_pesos += d['peso']
+
+                if suma_pesos > 0:
+                    fc_regla = suma_ponderada / suma_pesos
+
+                    if fc_regla >= umbral:
+                        fc_total = CertezaService.combinar_mycin(fc_total, fc_regla)
+
+                        self.trazas_actuales.append(
+                            f"[COMPUESTA] Regla {id_regla} activada (FC={fc_regla:.3f})"
+                        )
+
+            return fc_total
+    # nueva función 23/04/26 para obtener confiabilidad de un hecho específico en una evaluación
+    def obtener_confiabilidad(self, id_ev, id_hecho):
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT confiabilidad FROM memoria_trabajo
+                WHERE id_ev=%s AND id_hecho=%s
+            """, (id_ev, id_hecho))
+
+            row = cursor.fetchone()
+            return float(row['confiabilidad']) if row else 1.0
