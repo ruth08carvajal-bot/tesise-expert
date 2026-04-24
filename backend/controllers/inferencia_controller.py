@@ -1,6 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from services.motor_inferencia import MotorInferencia
 from models.conexion_db import db_admin
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 motor = MotorInferencia()
@@ -30,4 +35,4 @@ async def procesar_diagnostico(id_ev: int):
             return {"status": "success", "data": [], "mensaje": "No hay suficiente evidencia."}
         return {"status": "success", "data": resultado}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno del servidor")

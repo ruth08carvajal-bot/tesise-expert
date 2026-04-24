@@ -2,6 +2,11 @@ from fastapi import APIRouter, HTTPException
 from models.conexion_db import db_admin
 from pydantic import BaseModel
 from datetime import date, datetime
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -40,7 +45,8 @@ async def registrar_nino(nino: NinoSchema):
             conn.commit()
             return {"status": "success", "id_nino": cursor.lastrowid}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error registrando niño: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/mis-ninos/{id_tut}")
 async def listar_ninos(id_tut: int):

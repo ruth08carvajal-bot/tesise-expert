@@ -1,6 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from models.conexion_db import db_admin
 from pydantic import BaseModel
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -65,4 +70,4 @@ async def register(datos: RegisterSchema):
             return {"status": "success", "username_generado": datos.username}
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno del servidor")

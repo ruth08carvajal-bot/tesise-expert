@@ -1,8 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from models.conexion_db import db_admin
 from datetime import date, datetime
+import logging
 # Importamos la función desde tu controlador de niños
-from controllers.ninos_controller import calcular_edad 
+from controllers.ninos_controller import calcular_edad
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -64,7 +69,7 @@ async def obtener_preguntas_dinamicas(id_nino: int):
             }
 
     except Exception as e:
-        print(f"ERROR CRÍTICO EN ANAMNESIS: {str(e)}")
+        logger.error(f"Error obteniendo preguntas dinámicas para id_nino={id_nino}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en el servidor: {str(e)}")
 
 @router.post("/guardar-anamnesis")
@@ -92,5 +97,5 @@ async def guardar_anamnesis(data: dict):
             return {"status": "success", "message": "Resultados guardados correctamente"}
             
     except Exception as e:
-        print(f"ERROR AL GUARDAR ANAMNESIS: {str(e)}")
+        logger.error(f"Error guardando anamnesis para id_nino={id_nino}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error al guardar en la base de datos")

@@ -3,7 +3,12 @@ import numpy as np
 import librosa
 import soundfile as sf # Motor portátil para WAV
 import traceback
+import logging
 from models.conexion_db import db_admin
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class MFCCService:
     def __init__(self):
@@ -42,7 +47,7 @@ class MFCCService:
             mfccs = librosa.feature.mfcc(y=y, sr=self.SR, n_mfcc=13)
             return np.mean(mfccs, axis=1)
         except Exception as e:
-            print(f"--- ERROR EN EXTRACCIÓN MFCC ---")
+            logger.error("--- ERROR EN EXTRACCIÓN MFCC ---")
             traceback.print_exc()
             raise e
 
@@ -88,7 +93,7 @@ class MFCCService:
             elif os.path.exists(patron_wav):
                 v_patron = self.extraer_vector_mfcc(patron_wav)
             else:
-                print(f"CRÍTICO: No existe patrón para [{fonema}] en .npy ni .wav")
+                logger.error(f"CRÍTICO: No existe patrón para [{fonema}] en .npy ni .wav")
                 return 0.0
 
             # 2. Extraer vector del niño
@@ -105,7 +110,7 @@ class MFCCService:
             else:
                 id_hecho = self.MAPEO_FONEMAS.get(fonema, 0)
 
-            print(f"DEBUG MFCC: Fonema={fonema}, ID_Hecho={id_hecho}, Similitud={fc_obtenido}")
+            logger.debug(f"DEBUG MFCC: Fonema={fonema}, ID_Hecho={id_hecho}, Similitud={fc_obtenido}")
 
             if id_hecho > 0:
                 with db_admin.obtener_conexion() as conn:

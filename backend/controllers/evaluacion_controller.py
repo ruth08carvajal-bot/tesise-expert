@@ -6,28 +6,40 @@ from models.conexion_db import db_admin
 import shutil
 import os
 import subprocess
+import logging
+import tempfile
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 mfcc_service = MFCCService()
 motor = MotorInferencia()
+
+# Usar variable de entorno para ffmpeg
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
 
 class EvaluacionManual(BaseModel):
     id_nino: int
     id_evaluacion: int
     id_hecho: int
     valor: float
-    #id_tipo_evidencia: Optional[int] = None nuevo 23/04/26, lo dejamos fijo en el endpoint para no complicar el front con esta lógica
-def obtener_id_tipo_evidencia(nombre_tipo: str):
-    with db_admin.obtener_conexion() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id_tipo FROM tipo_evidencia WHERE nombre = %s",
-            (nombre_tipo,)
-        )
-        result = cursor.fetchone()
-        if not result:
-            raise Exception(f"Tipo de evidencia '{nombre_tipo}' no existe")
-        return result[0]
+def obtener_id_tipo_evidencia(nombre_tipo: str) -> int:
+    try:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id_tipo FROM tipo_evidencia WHERE nombre = %s",
+                (nombre_tipo,)
+            )
+            result = cursor.fetchone()
+            if not result:
+                raise ValueError(f"Tipo de evidencia '{nombre_tipo}' no existe")
+            return result[0]
+    except Exception as e:
+        logger.error(f"Error obteniendo id_tipo_evidencia para '{nombre_tipo}': {e}")
+        raise
 @router.post("/iniciar-evaluacion")
 async def iniciar_evaluacion(id_nino: int = Form(...)):
     try:
@@ -42,77 +54,64 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
             conn.commit()
             return {"status": "success", "id_evaluacion": id_evaluacion}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error iniciando evaluación para id_nino={id_nino}: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.post("/evaluar-fonema")
 async def evaluar_fonema(
     id_nino: int = Form(...),
     id_evaluacion: int = Form(...),
-    fonema_objetivo: str = Form(...), # Este es el id_hecho que viene del front
+    fonema_objetivo: str = Form(...),
     audio: UploadFile = File(...)
 ):
+    temp_audio_path = None
     try:
-        # 1. Mapeo y procesamiento de audio
+        logger.info(f"Recibida petición evaluar_fonema: id_nino={id_nino}, id_evaluacion={id_evaluacion}, fonema_objetivo={fonema_objetivo}, audio.filename={audio.filename}")
+
+        # Validar entrada
+        if not fonema_objetivo or not audio.filename:
+            raise HTTPException(status_code=400, detail="Parámetros inválidos")
+
         nombre_fonema = mapear_id_a_nombre(fonema_objetivo)
-        os.makedirs("data/temp_audios", exist_ok=True)
-        
-        # Guardamos con la extensión que venga (.webm o .ogg habitualmente)
-        ext = audio.filename.split('.')[-1]
-        audio_path = f"data/temp_audios/{id_nino}_{nombre_fonema}.{ext}"
-        
-        await audio.seek(0)
-        with open(audio_path, "wb") as buffer:
-            shutil.copyfileobj(audio.file, buffer)
+        # Remover validación estricta del mapeo para permitir fonemas no mapeados
+
+        # Crear directorio temporal si no existe
+        temp_dir = "data/temp_audios"
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # Usar archivo temporal
+        ext = audio.filename.split('.')[-1].lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}", dir=temp_dir) as temp_file:
+            temp_audio_path = temp_file.name
+            shutil.copyfileobj(audio.file, temp_file)
+
+        audio_path = temp_audio_path
 
         # Convertir a WAV si es necesario
-        if ext.lower() in ['webm', 'ogg', 'mp3']:
+        if ext in ['webm', 'ogg', 'mp3']:
             wav_path = audio_path.replace(f'.{ext}', '.wav')
             try:
-                ffmpeg_path = r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe"
-                #ffmpeg_path = r"C:\ffmpeg\bin\ffmpeg.exe"
-                # AÑADIMOS '-y' al inicio de la lista de argumentos
-                subprocess.run([ffmpeg_path, '-y','-i', audio_path, '-acodec', 'pcm_s16le', '-ar', '16000', wav_path], check=True)
+                subprocess.run([
+                    FFMPEG_PATH, '-y', '-i', audio_path,
+                    '-acodec', 'pcm_s16le', '-ar', '16000', wav_path
+                ], check=True, capture_output=True)
                 audio_path = wav_path
-                os.remove(audio_path.replace('.wav', f'.{ext}'))  # Eliminar el original
+                os.remove(temp_audio_path)
+                temp_audio_path = audio_path  # Actualizar para limpieza
             except subprocess.CalledProcessError as e:
-                print(f"Error convirtiendo audio: {e}")
+                logger.error(f"Error convirtiendo audio: {e}")
                 raise HTTPException(status_code=500, detail="Error procesando el audio")
-        # 2. Obtener resultado del MFCC
+
+        # Obtener resultado del MFCC
         porcentaje_similitud = mfcc_service.procesar_evaluacion(
-            audio_nino_path=audio_path, 
-            fonema=nombre_fonema, 
+            audio_nino_path=audio_path,
+            fonema=nombre_fonema,
             id_ev=id_evaluacion
         )
-        # nuevo: actualizar rendimiento histórico
+
+        # Actualizar rendimiento y memoria de trabajo
         actualizar_rendimiento(id_nino, int(fonema_objetivo), porcentaje_similitud)
-        # 3. ¡NUEVO!: PERSISTENCIA EN MEMORIA DE TRABAJO
-                # CORRECCIÓN: ahora obtenemos id_tipo_evidencia dinámicamente para no hardcodear el '4' y que sea más flexible a cambios futuros 23/04/26
-        with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor()
-
-            id_tipo = obtener_id_tipo_evidencia("MFCC")
-
-            query_memoria = """
-                INSERT INTO memoria_trabajo 
-                (id_ev, id_hecho, valor_obtenido, id_tipo_evidencia, confiabilidad, fuente) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE valor_obtenido = %s
-            """
-
-            cursor.execute(query_memoria, (
-                id_evaluacion,
-                fonema_objetivo,
-                porcentaje_similitud,
-                id_tipo,
-                0.9,            # confiabilidad MFCC
-                "MFCC",
-                porcentaje_similitud
-            ))
-
-            conn.commit() # fin de la corrección para obtener id_tipo_evidencia dinámicamente
-
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
+        insertar_en_memoria_trabajo(id_evaluacion, fonema_objetivo, porcentaje_similitud, "MFCC", 0.9)
 
         return {
             "status": "success",
@@ -120,46 +119,35 @@ async def evaluar_fonema(
             "id_hecho": fonema_objetivo,
             "fonema_evaluado": nombre_fonema
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"DEBUG ERROR: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en evaluar_fonema: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+    finally:
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.remove(temp_audio_path)
+            except OSError:
+                pass
 
 # CORRECCIÓN: ahora el endpoint de evaluación manual también actualiza el rendimiento histórico y obtiene id_tipo_evidencia dinámicamente para mantener consistencia con el endpoint de evaluación automática 23/04/26
 @router.post("/evaluar-manual")
 async def evaluar_manual(datos: EvaluacionManual):
     try:
+        # Validar entrada
+        if not isinstance(datos.valor, (int, float)) or not (0 <= datos.valor <= 1):
+            raise HTTPException(status_code=400, detail="Valor debe ser un número entre 0 y 1")
+
         actualizar_rendimiento(datos.id_nino, datos.id_hecho, datos.valor)
-
-        with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor()
-
-            # Puedes decidir si esto es FUZZY o OTRO
-            # Aquí lo pongo como OTRO (evaluación directa)
-            id_tipo = obtener_id_tipo_evidencia("OTRO")
-
-            query = """
-                INSERT INTO memoria_trabajo 
-                (id_ev, id_hecho, valor_obtenido, id_tipo_evidencia, confiabilidad, fuente) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE valor_obtenido = %s
-            """
-
-            cursor.execute(query, (
-                datos.id_evaluacion,
-                datos.id_hecho,
-                datos.valor,
-                id_tipo,
-                1.0,            # máxima confiabilidad
-                "MANUAL",
-                datos.valor
-            ))
-
-            conn.commit()
+        insertar_en_memoria_trabajo(datos.id_evaluacion, str(datos.id_hecho), datos.valor, "OTRO", 1.0)
 
         return {"status": "success", "similitud_detectada": datos.valor}
-
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error en evaluar_manual: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 # NUEVO ENDPOINT PARA OBTENER PLAN DE EJERCICIOS PERSONALIZADO BASADO EN RENDIMIENTO HISTÓRICO Y HECHOS OBJETIVO DE LOS EJERCICIOS 23/04/26
 @router.get("/plan-evaluacion/{id_nino}")
 async def obtener_plan_personalizado(id_nino: int):
@@ -194,7 +182,8 @@ async def obtener_plan_personalizado(id_nino: int):
             }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error obteniendo plan de evaluación para id_nino={id_nino}: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
         
 def mapear_id_a_nombre(entrada):
     mapeo_inv = {'1': 'r', '2': 'ere', '3': 's', '4': 'l', '5': 'c', '6': 't', '7': 'd', '8': 'p', '9': 'b', '10': 'g', '14': 'f', '16': 'ch'}
@@ -206,47 +195,78 @@ def mapear_id_a_nombre(entrada):
 @router.get("/ejecutar-diagnostico/{id_nino}/{id_evaluacion}")
 async def ejecutar_diagnostico(id_nino: int, id_evaluacion: int):
     try:
+        # Validar entrada
+        if id_nino <= 0 or id_evaluacion <= 0:
+            raise HTTPException(status_code=400, detail="IDs inválidos")
+
         # Usamos el método de tu Motor de Inferencia
         resultados = motor.ejecutar_diagnostico_completo(id_nino, id_evaluacion)
         return {"status": "success", "diagnosticos": resultados}
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error en motor: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error ejecutando diagnóstico para id_nino={id_nino}, id_evaluacion={id_evaluacion}: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 # nueva función para actualizar rendimiento después de cada evaluación
-def actualizar_rendimiento(id_nino, id_hecho, nuevo_valor):
-    with db_admin.obtener_conexion() as conn:
-        cursor = conn.cursor(dictionary=True)
+def actualizar_rendimiento(id_nino: int, id_hecho: int, nuevo_valor: float):
+    try:
+        # Validar entrada
+        if not isinstance(nuevo_valor, (int, float)) or not (0 <= nuevo_valor <= 1):
+            raise ValueError("Valor debe ser un número entre 0 y 1")
 
-        cursor.execute("""
-            SELECT promedio, intentos FROM rendimiento_hecho
-            WHERE id_nino = %s AND id_hecho = %s
-        """, (id_nino, id_hecho))
-        
-        row = cursor.fetchone()
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
 
-        if row:
-            promedio_actual = row['promedio']
-            intentos = row['intentos'] + 1
+            cursor.execute("""
+                SELECT promedio, intentos FROM rendimiento_hecho
+                WHERE id_nino = %s AND id_hecho = %s
+            """, (id_nino, id_hecho))
 
-            nuevo_promedio = ((promedio_actual * row['intentos']) + nuevo_valor) / intentos
+            row = cursor.fetchone()
 
-            #tendencia = "Sube" if nuevo_valor > promedio_actual else "Baja"
-            if nuevo_valor > promedio_actual:
-                tendencia = "Sube"
-            elif nuevo_valor < promedio_actual:
-                tendencia = "Baja"
+            if row:
+                promedio_actual = row['promedio']
+                intentos = row['intentos'] + 1
+                nuevo_promedio = ((promedio_actual * row['intentos']) + nuevo_valor) / intentos
+
+                if nuevo_valor > promedio_actual:
+                    tendencia = "Sube"
+                elif nuevo_valor < promedio_actual:
+                    tendencia = "Baja"
+                else:
+                    tendencia = "Estable"
+
+                cursor.execute("""
+                    UPDATE rendimiento_hecho
+                    SET promedio=%s, intentos=%s, tendencia=%s
+                    WHERE id_nino=%s AND id_hecho=%s
+                """, (nuevo_promedio, intentos, tendencia, id_nino, id_hecho))
             else:
-                tendencia = "Estable"
+                cursor.execute("""
+                    INSERT INTO rendimiento_hecho (id_nino, id_hecho, promedio, intentos, tendencia)
+                    VALUES (%s,%s,%s,1,'Estable')
+                """, (id_nino, id_hecho, nuevo_valor))
 
-            cursor.execute("""
-                UPDATE rendimiento_hecho
-                SET promedio=%s, intentos=%s, tendencia=%s
-                WHERE id_nino=%s AND id_hecho=%s
-            """, (nuevo_promedio, intentos, tendencia, id_nino, id_hecho))
-        else:
-            cursor.execute("""
-                INSERT INTO rendimiento_hecho (id_nino, id_hecho, promedio, intentos, tendencia)
-                VALUES (%s,%s,%s,1,'Estable')
-            """, (id_nino, id_hecho, nuevo_valor))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error actualizando rendimiento para id_nino={id_nino}, id_hecho={id_hecho}: {e}")
+        raise
 
-        conn.commit()
+def insertar_en_memoria_trabajo(id_evaluacion: int, id_hecho: str, valor: float, fuente: str, confiabilidad: float):
+    try:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor()
+            id_tipo = obtener_id_tipo_evidencia(fuente)
+            query = """
+                INSERT INTO memoria_trabajo 
+                (id_ev, id_hecho, valor_obtenido, id_tipo_evidencia, confiabilidad, fuente) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE valor_obtenido = %s
+            """
+            cursor.execute(query, (
+                id_evaluacion, id_hecho, valor, id_tipo, confiabilidad, fuente, valor
+            ))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error insertando en memoria_trabajo: {e}")
+        raise

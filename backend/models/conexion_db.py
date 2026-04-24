@@ -2,6 +2,11 @@ import os
 import mysql.connector
 from mysql.connector import Error
 from contextlib import contextmanager
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self):
@@ -30,11 +35,11 @@ class Database:
             )
             yield conexion
         except Error as e:
-            print(f"Error crítico de base de datos: {e}")
+            logger.error(f"Error crítico de base de datos: {e}")
             raise
         finally:
             if conexion and conexion.is_connected():
                 conexion.close()
-                print("Conexión cerrada de forma segura por el gestor de contexto.")
+                logger.info("Conexión cerrada de forma segura por el gestor de contexto.")
 
 db_admin = Database()
