@@ -68,7 +68,7 @@ async def evaluar_fonema(
         if ext.lower() in ['webm', 'ogg', 'mp3']:
             wav_path = audio_path.replace(f'.{ext}', '.wav')
             try:
-                ffmpeg_path = r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe" PARA LA RUTH
+                ffmpeg_path = r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe"
                 #ffmpeg_path = r"C:\ffmpeg\bin\ffmpeg.exe"
                 # AÑADIMOS '-y' al inicio de la lista de argumentos
                 subprocess.run([ffmpeg_path, '-y','-i', audio_path, '-acodec', 'pcm_s16le', '-ar', '16000', wav_path], check=True)
