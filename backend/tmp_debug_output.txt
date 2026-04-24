@@ -1,3 +1,0 @@
-OK count=13
-type=<class 'services.motor_inferencia.ResultadoDiagnostico'>
-ResultadoDiagnostico(id_diag=25, nombre_diag='Trastorno de la Percepción Temporal', fc_total=0.27, explicacion=['Hecho H136 → FC=0.27 (conf=1.0) → Total=0.2700'])
