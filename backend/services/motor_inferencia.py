@@ -69,26 +69,14 @@ class MotorInferencia:
 
             res = cursor.fetchone()
             if res:
-                #return float(res['valor_obtenido']) * float(res.get('confiabilidad', 1.0))
-                #cambios para considerar confiabilidad 23/04/26
                 valor = float(res['valor_obtenido'])
                 confiabilidad = float(res.get('confiabilidad', 1.0))
                 return valor * confiabilidad
             return 0.0
-
-            # fallback anamnesis
-            cursor.execute("""
-                SELECT 1.0 as valor
-                FROM anamnesis_hechos 
-                WHERE id_nino = %s AND id_hecho = %s
-            """, (id_nino, id_hecho))
-
-            res = cursor.fetchone()
-            return float(res['valor']) if res else 0.0
     #nueva funcion 23/04/26 para obtener rendimiento histórico de un hecho específico
     def obtener_rendimiento_hecho(self, id_nino: int, id_hecho: int) -> float:
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute("""
                 SELECT promedio FROM rendimiento_hecho
                 WHERE id_nino = %s AND id_hecho = %s
@@ -226,7 +214,7 @@ class MotorInferencia:
     # nueva función 23/04/26 para obtener confiabilidad de un hecho específico en una evaluación
     def obtener_confiabilidad(self, id_ev, id_hecho):
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute("""
                 SELECT confiabilidad FROM memoria_trabajo
                 WHERE id_ev=%s AND id_hecho=%s

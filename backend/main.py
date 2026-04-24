@@ -7,6 +7,7 @@ from controllers.login_controller import router as login_router
 from controllers.ninos_controller import router as ninos_router
 from controllers.evaluacion_controller import router as evaluacion_router
 from controllers.anamnesis_controller import router as anamnesis_router
+from controllers.inferencia_controller import router as inferencia_router
 
 app = FastAPI(
     title="Sistema Experto Fonoaudiológico - Tesis",
@@ -28,6 +29,7 @@ app.include_router(login_router, prefix="/auth", tags=["Autenticación"])
 app.include_router(ninos_router, prefix="/ninos", tags=["Gestión de Pacientes"])
 app.include_router(evaluacion_router, prefix="/evaluacion", tags=["Motor de Inferencia"])
 app.include_router(anamnesis_router, prefix="/anamnesis", tags=["Anamnesis"])
+app.include_router(inferencia_router, prefix="/inferencia", tags=["Inferencia"])
 
 @app.get("/")
 async def root():
