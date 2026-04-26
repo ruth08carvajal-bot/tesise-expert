@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { obtenerResultadosDiagnostico } from '../../api/evaluacionService';
+import axios from 'axios';  // ← AÑADIR ESTA LÍNEA
 
 const ResultadosDiagnostico = ({ idNino, idEvaluacion }) => {
     const [diagnosticos, setDiagnosticos] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState(null);
-
+    // ===== NUEVOS ESTADOS PARA NOTAS ===== 26/04/2026
+    const [notas, setNotas] = useState('');
+    const [guardandoNotas, setGuardandoNotas] = useState(false);
+    
     useEffect(() => {
         const obtenerResultados = async () => {
             if (!idNino || !idEvaluacion) {
@@ -27,6 +31,26 @@ const ResultadosDiagnostico = ({ idNino, idEvaluacion }) => {
 
         obtenerResultados();
     }, [idNino, idEvaluacion]);
+    // ===== NUEVA FUNCIÓN PARA GUARDAR NOTAS ===== inicio 26/04/2026
+    const guardarNotas = async () => {
+        if (!notas.trim()) return;
+        
+        setGuardandoNotas(true);
+        try {
+            const formData = new FormData();
+            formData.append('id_evaluacion', idEvaluacion);
+            formData.append('notas', notas);
+            
+            await axios.post('http://127.0.0.1:8003/evaluacion/agregar-notas', formData);
+            alert('Notas guardadas correctamente');
+        } catch (error) {
+            console.error('Error guardando notas:', error);
+            alert('Error al guardar las notas');
+        } finally {
+            setGuardandoNotas(false);
+        }
+    };
+    // fin NUEVA FUNCIÓN PARA GUARDAR NOTAS 26/04/2026
 
     if (cargando) return <div style={{textAlign: 'center', padding: '50px'}}>Procesando inferencia clínica...</div>;
     if (error) return <div style={{textAlign: 'center', padding: '50px', color: '#b71c1c'}}>{error}</div>;
@@ -71,6 +95,25 @@ const ResultadosDiagnostico = ({ idNino, idEvaluacion }) => {
                     </div>
                 )}
             </div>
+            {/* ===== NUEVA SECCIÓN DE NOTAS ===== */}
+            <div style={notasSectionStyle}>
+                <h3 style={sectionTitleStyle}>📝 Notas del Tutor</h3>
+                <textarea
+                    style={textareaStyle}
+                    placeholder="Agregue observaciones adicionales, comentarios sobre el comportamiento del niño durante la evaluación, o notas para la próxima sesión..."
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                    rows={4}
+                />
+                <button 
+                    onClick={guardarNotas} 
+                    style={saveNotesBtnStyle}
+                    disabled={guardandoNotas || !notas.trim()}
+                >
+                    {guardandoNotas ? 'Guardando...' : 'Guardar Notas'}
+                </button>
+            </div>
+            {/* ================================= */}
 
             <div style={{ display: 'flex', gap: '10px' }}>
                 <button
@@ -113,5 +156,43 @@ const btnStyle = {
     cursor: 'pointer',
     fontWeight: 'bold'
 };
+// inicio NUEVOS ESTILOS PARA NOTAS 26/04/2026
+const notasSectionStyle = {
+    marginTop: '30px',
+    padding: '20px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '10px',
+    border: '1px solid #e9ecef'
+};
+
+const sectionTitleStyle = {
+    margin: '0 0 15px 0',
+    fontSize: '18px',
+    color: '#2c3e50'
+};
+
+const textareaStyle = {
+    width: '100%',
+    padding: '12px',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    fontSize: '14px',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    marginBottom: '10px',
+    boxSizing: 'border-box'
+};
+
+const saveNotesBtnStyle = {
+    padding: '10px 20px',
+    backgroundColor: '#27ae60',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px'
+};
+// fin NUEVOS ESTILOS PARA NOTAS 26/04/2026
 
 export default ResultadosDiagnostico;

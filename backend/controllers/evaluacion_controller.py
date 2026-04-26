@@ -11,8 +11,12 @@ import os
 import subprocess
 import logging
 import tempfile
+import numpy as np
+import librosa
+from typing import List, Dict  # ← AÑADIR ESTA LÍNEA
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from datetime import datetime, date
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +28,8 @@ motor = MotorInferencia()
 explicacion_service = ExplicacionService()
 
 # Usar variable de entorno para ffmpeg
-FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
+#FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe")
 
 class EvaluacionManual(BaseModel):
     id_nino: int
@@ -46,11 +51,79 @@ def obtener_id_tipo_evidencia(nombre_tipo: str) -> int:
     except Exception as e:
         logger.error(f"Error obteniendo id_tipo_evidencia para '{nombre_tipo}': {e}")
         raise
+# inicio de la función para iniciar evaluación con validación de 3 meses entre evaluaciones 26/04/2026
 @router.post("/iniciar-evaluacion")
 async def iniciar_evaluacion(id_nino: int = Form(...)):
     try:
         with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(dictionary=True)
+            
+            # 1. Verificar si el niño tiene evaluaciones previas
+            cursor.execute("""
+                SELECT id_ev, fecha_eval, tipo_evaluacion 
+                FROM evaluacion_sesion 
+                WHERE id_nino = %s 
+                ORDER BY fecha_eval DESC 
+                LIMIT 1
+            """, (id_nino,))
+            
+            ultima_evaluacion = cursor.fetchone()
+            
+            # 2. Si NO tiene evaluaciones previas → crear primera evaluación (INICIAL)
+            if not ultima_evaluacion:
+                query = """
+                    INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
+                    VALUES (%s, 'Inicial')
+                """
+                cursor.execute(query, (id_nino,))
+                id_evaluacion = cursor.lastrowid
+                conn.commit()
+                return {
+                    "status": "success", 
+                    "id_evaluacion": id_evaluacion,
+                    "tipo": "Inicial",
+                    "mensaje": "Primera evaluación creada exitosamente"
+                }
+            
+            # 3. Obtener fecha de la última evaluación
+            fecha_ultima = ultima_evaluacion['fecha_eval']
+            
+            #  VALIDACIÓN: Si la fecha es NULL, permitir evaluación
+            if fecha_ultima is None:
+                query = """
+                    INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
+                    VALUES (%s, 'Control')
+                """
+                cursor.execute(query, (id_nino,))
+                id_evaluacion = cursor.lastrowid
+                conn.commit()
+                return {
+                    "status": "success",
+                    "id_evaluacion": id_evaluacion,
+                    "tipo": "Control",
+                    "mensaje": "Evaluación creada (fecha anterior no disponible)"
+                }
+            
+            # 4. Convertir a date si es datetime
+            hoy = datetime.now().date()
+            if isinstance(fecha_ultima, datetime):
+                fecha_ultima = fecha_ultima.date()
+            
+            # 5. Calcular diferencia en meses
+            meses_diferencia = (hoy.year - fecha_ultima.year) * 12 + (hoy.month - fecha_ultima.month)
+            
+            # 6. Si pasaron menos de 3 meses → NO permitir nueva evaluación
+            if meses_diferencia < 3:
+                return {
+                    "status": "error",
+                    "puede_evaluar": False,
+                    "id_evaluacion_existente": ultima_evaluacion['id_ev'],
+                    "fecha_ultima_evaluacion": fecha_ultima.strftime('%Y-%m-%d'),
+                    "meses_restantes": 3 - meses_diferencia,
+                    "mensaje": f"El niño ya fue evaluado hace {meses_diferencia} meses. Deben pasar al menos 3 meses para una reevaluación. Puede ver los resultados de la evaluación anterior."
+                }
+            
+            # 7. Si pasaron 3 meses o más → crear reevaluación (CONTROL)
             query = """
                 INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
                 VALUES (%s, 'Control')
@@ -58,11 +131,20 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
             cursor.execute(query, (id_nino,))
             id_evaluacion = cursor.lastrowid
             conn.commit()
-            return {"status": "success", "id_evaluacion": id_evaluacion}
+            
+            return {
+                "status": "success", 
+                "id_evaluacion": id_evaluacion,
+                "tipo": "Control",
+                "fecha_ultima_evaluacion": fecha_ultima.strftime('%Y-%m-%d'),
+                "meses_desde_ultima": meses_diferencia,
+                "mensaje": f"Reevaluación creada después de {meses_diferencia} meses"
+            }
+            
     except Exception as e:
         logger.error(f"Error iniciando evaluación para id_nino={id_nino}: {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
-
+# fin de la función para iniciar evaluación con validación de 3 meses entre evaluaciones 26/04/2026
 @router.post("/evaluar-fonema")
 async def evaluar_fonema(
     id_nino: int = Form(...),
@@ -255,12 +337,87 @@ async def ejecutar_diagnostico(id_nino: int, id_evaluacion: int):
             raise HTTPException(status_code=400, detail="IDs inválidos")
 
         informe = obtener_informe_clinico(id_nino, id_evaluacion)
+        
+        # inicio NUEVO: Guardar el diagnóstico en evaluacion_sesion 26/04/2026
+        try:
+            with db_admin.obtener_conexion() as conn:
+                cursor = conn.cursor()
+                
+                # Generar texto resumen del diagnóstico
+                diagnosticos_texto = ""
+                for d in informe.get('diagnosticos', []):
+                    if d.get('fc_total', 0) > 0.5:
+                        diagnosticos_texto += f"- {d.get('nombre_diag', '')} (certeza: {d.get('fc_total', 0)*100:.1f}%)\n"
+                
+                if not diagnosticos_texto:
+                    diagnosticos_texto = "No se encontraron diagnósticos con certeza suficiente (>50%)"
+                
+                # Generar sugerencia de ejercicios
+                ejercicios_texto = ""
+                for e in informe.get('plan', [])[:5]:
+                    ejercicios_texto += f"- {e.get('nombre_ejercicio', '')} (Nivel: {e.get('nivel_dificultad', '')})\n"
+                
+                if not ejercicios_texto:
+                    ejercicios_texto = "Completar más evaluaciones para obtener recomendaciones personalizadas"
+                
+                # Actualizar la sesión de evaluación
+                query = """
+                    UPDATE evaluacion_sesion 
+                    SET diagnostico_sistema = %s,
+                        pronostico_sistema = %s,
+                        sugerencia_ejercicios = %s,
+                        explicacion_logica = %s
+                    WHERE id_ev = %s
+                """
+                
+                pronostico = _generar_pronostico(informe.get('diagnosticos', []))
+                explicacion = informe.get('explicacion_general', 'Evaluación completada. Revise los detalles para más información.')
+                
+                cursor.execute(query, (
+                    diagnosticos_texto,
+                    pronostico,
+                    ejercicios_texto,
+                    explicacion,
+                    id_evaluacion
+                ))
+                conn.commit()
+                logger.info(f"Evaluación {id_evaluacion} actualizada con diagnóstico")
+                
+        except Exception as e:
+            logger.error(f"Error guardando diagnóstico en evaluacion_sesion: {e}")
+            # No lanzamos excepción para no romper la respuesta al frontend fin NUEVO 26/04/2026
         return {"status": "success", **informe}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error ejecutando diagnóstico para id_nino={id_nino}, id_evaluacion={id_evaluacion}: {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+    
+# inicio función para generar pronóstico basado en diagnósticos 26/04/2026
+def _generar_pronostico(diagnosticos: List[Dict]) -> str:
+    """Genera un pronóstico basado en los diagnósticos encontrados."""
+    if not diagnosticos:
+        return "Sin diagnósticos concluyentes. Se recomienda seguimiento en 6 meses."
+    
+    diagnosticos_fuertes = [d for d in diagnosticos if d.get('fc_total', 0) > 0.7]
+    diagnosticos_moderados = [d for d in diagnosticos if 0.5 <= d.get('fc_total', 0) <= 0.7]
+    
+    if diagnosticos_fuertes:
+        return """Pronóstico: Reservado a favorable con intervención temprana.
+Se recomienda iniciar terapia fonoaudiológica de forma regular (2-3 veces por semana).
+Reevaluar en 3 meses para ajustar objetivos terapéuticos."""
+    
+    elif diagnosticos_moderados:
+        return """Pronóstico: Favorable con seguimiento.
+Se recomienda implementar ejercicios en casa y seguimiento mensual.
+Reevaluar en 6 meses para verificar progresos."""
+    
+    else:
+        return """Pronóstico: Bueno.
+El niño se encuentra dentro de parámetros esperados para su edad.
+Mantener estimulación en casa y reevaluar anualmente."""
+# fin función para generar pronóstico basado en diagnósticos 26/04/2026
+
 # nueva función para actualizar rendimiento después de cada evaluación
 def actualizar_rendimiento(id_nino: int, id_hecho: int, nuevo_valor: float):
     try:
@@ -306,6 +463,31 @@ def actualizar_rendimiento(id_nino: int, id_hecho: int, nuevo_valor: float):
         logger.error(f"Error actualizando rendimiento para id_nino={id_nino}, id_hecho={id_hecho}: {e}")
         raise
 
+#endpoint para que el tutor agregue notas inicio 26/04/2026
+@router.post("/agregar-notas")
+async def agregar_notas_evaluacion(
+    id_evaluacion: int = Form(...),
+    notas: str = Form(...)
+):
+    """Permite al tutor agregar notas a una evaluación existente."""
+    try:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor()
+            query = """
+                UPDATE evaluacion_sesion 
+                SET notas_tutor = %s
+                WHERE id_ev = %s
+            """
+            cursor.execute(query, (notas, id_evaluacion))
+            conn.commit()
+            
+            return {"status": "success", "mensaje": "Notas guardadas correctamente"}
+            
+    except Exception as e:
+        logger.error(f"Error guardando notas: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+    # fin endpoint para que el tutor agregue notas 26/04/2026
+    
 def insertar_en_memoria_trabajo(id_evaluacion: int, id_hecho: str, valor: float, fuente: str, confiabilidad: float):
     try:
         with db_admin.obtener_conexion() as conn:
@@ -452,93 +634,283 @@ def obtener_informe_clinico(id_nino: int, id_evaluacion: int):
         'faq': explicacion_service.preguntas_frecuentes()
     }
 
-
+#inicio nuevo endpoint para generar PDF clínico completo 26/04/2026
 def generar_pdf_clinico(id_nino: int, id_evaluacion: int) -> str:
-    informe = obtener_informe_clinico(id_nino, id_evaluacion)
+    """Genera un PDF profesional con el informe clínico completo."""
+    
+    # Obtener datos actualizados de la BD (incluye lo que guardamos en Paso 1)
+    with db_admin.obtener_conexion() as conn:
+        cursor = conn.cursor(dictionary=True)
+        
+        # Obtener datos del niño
+        cursor.execute("""
+            SELECT n.nombre, n.f_nac, n.genero, n.escolaridad, t.nombre as tutor_nombre
+            FROM nino n
+            JOIN tutor t ON n.id_tut = t.id_tut
+            WHERE n.id_nino = %s
+        """, (id_nino,))
+        nino = cursor.fetchone()
+        
+        # Obtener datos de la evaluación (ya actualizados)
+        cursor.execute("""
+            SELECT diagnostico_sistema, pronostico_sistema, sugerencia_ejercicios, 
+                   explicacion_logica, fecha_eval, tipo_evaluacion
+            FROM evaluacion_sesion
+            WHERE id_ev = %s
+        """, (id_evaluacion,))
+        evaluacion = cursor.fetchone()
+        
+        # Obtener puntajes MFCC
+        cursor.execute("""
+            SELECT bh.descripcion, mt.valor_obtenido, mt.confiabilidad
+            FROM memoria_trabajo mt
+            JOIN base_hechos bh ON mt.id_hecho = bh.id_hecho
+            WHERE mt.id_ev = %s AND mt.fuente = 'MFCC'
+            ORDER BY mt.valor_obtenido ASC
+        """, (id_evaluacion,))
+        mfcc_scores = cursor.fetchall()
+        
+        # Obtener anamnesis relevante
+        cursor.execute("""
+            SELECT bh.descripcion
+            FROM anamnesis_hechos ah
+            JOIN base_hechos bh ON ah.id_hecho = bh.id_hecho
+            WHERE ah.id_nino = %s
+            LIMIT 10
+        """, (id_nino,))
+        anamnesis = cursor.fetchall()
+    
+    # Calcular edad
+    edad_nino = calcular_edad(nino['f_nac'])
+    
+    # Crear PDF
     temp_dir = tempfile.mkdtemp()
     pdf_path = os.path.join(temp_dir, f"reporte_clinico_{id_nino}_{id_evaluacion}.pdf")
     c = canvas.Canvas(pdf_path, pagesize=letter)
     width, height = letter
     y = height - 60
-
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, y, f"Informe Clínico - Niño {id_nino}")
-    y -= 30
-
-    c.setFont("Helvetica", 11)
-    c.drawString(50, y, f"Evaluación: {id_evaluacion}    Edad: {obtener_edad_nino(id_nino)} años")
+    
+    # =========================================================
+    # ENCABEZADO
+    # =========================================================
+    c.setFont("Helvetica-Bold", 18)
+    c.setFillColorRGB(0.2, 0.3, 0.5)  # Color azul institucional
+    c.drawString(50, y, "INFORME DE EVALUACIÓN FONOAUDIOLÓGICA")
     y -= 25
-
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Resumen clínico:")
+    
+    c.setFont("Helvetica", 10)
+    c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.drawString(50, y, f"Fecha de emisión: {datetime.now().strftime('%d/%m/%Y')}")
     y -= 20
-    text = c.beginText(50, y)
-    text.setFont("Helvetica", 10)
-    for line in explicacion_service.formatear_parrafo(informe['explicacion_general']).split("\n"):
-        text.textLine(line)
-        y -= 14
+    
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y, "DATOS DEL PACIENTE")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y, f"Nombre: {nino['nombre']}")
+    y -= 14
+    c.drawString(50, y, f"Edad: {edad_nino} años")
+    y -= 14
+    c.drawString(50, y, f"Género: {nino['genero']}")
+    y -= 14
+    c.drawString(50, y, f"Escolaridad: {nino['escolaridad']}")
+    y -= 14
+    c.drawString(50, y, f"Tutor: {nino['tutor_nombre']}")
+    y -= 20
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y, "DATOS DE LA EVALUACIÓN")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y, f"Fecha de evaluación: {evaluacion['fecha_eval'].strftime('%d/%m/%Y')}")
+    y -= 14
+    
+    tipo_texto = "Evaluación Inicial" if evaluacion['tipo_evaluacion'] == 'Inicial' else "Evaluación de Control / Reevaluación"
+    c.drawString(50, y, f"Tipo: {tipo_texto}")
+    y -= 20
+    
+    # =========================================================
+    # DIAGNÓSTICO (desde la BD)
+    # =========================================================
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColorRGB(0.8, 0.2, 0.2)
+    c.drawString(50, y, "DIAGNÓSTICO CLÍNICO")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.setFillColorRGB(0, 0, 0)
+    
+    diagnostico_texto = evaluacion.get('diagnostico_sistema', 'No disponible')
+    for line in _formatear_parrafo_pdf(diagnostico_texto, 80):
+        c.drawString(60, y, line)
+        y -= 12
         if y < 80:
-            c.drawText(text)
             c.showPage()
             y = height - 60
-            text = c.beginText(50, y)
-            text.setFont("Helvetica", 10)
-    c.drawText(text)
-    y = text.getY() - 20
-
+            c.setFont("Helvetica", 10)
+    y -= 10
+    
+    # =========================================================
+    # PRONÓSTICO (desde la BD)
+    # =========================================================
+    if y < 120:
+        c.showPage()
+        y = height - 60
+    
     c.setFont("Helvetica-Bold", 12)
+    c.setFillColorRGB(0.2, 0.6, 0.2)
+    c.drawString(50, y, "PRONÓSTICO")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.setFillColorRGB(0, 0, 0)
+    
+    pronostico_texto = evaluacion.get('pronostico_sistema', 'No disponible')
+    for line in _formatear_parrafo_pdf(pronostico_texto, 80):
+        c.drawString(60, y, line)
+        y -= 12
+        if y < 80:
+            c.showPage()
+            y = height - 60
+            c.setFont("Helvetica", 10)
+    y -= 15
+    
+    # =========================================================
+    # PLAN DE INTERVENCIÓN (desde la BD)
+    # =========================================================
     if y < 150:
         c.showPage()
         y = height - 60
-    c.drawString(50, y, "Anamnesis relevante:")
-    y -= 20
-    c.setFont("Helvetica", 10)
-    for item in informe['anamnesis']:
-        c.drawString(60, y, f"- {item.get('descripcion', '')}")
-        y -= 14
-        if y < 80:
-            c.showPage()
-            y = height - 60
-    y -= 10
-
+    
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Diagnósticos detectados:")
-    y -= 20
+    c.setFillColorRGB(0.2, 0.3, 0.5)
+    c.drawString(50, y, "PLAN DE INTERVENCIÓN / EJERCICIOS RECOMENDADOS")
+    y -= 18
     c.setFont("Helvetica", 10)
-    for diag in informe['diagnosticos']:
-        c.drawString(60, y, f"- {diag.get('nombre', 'Diagnóstico')} ({round(diag.get('certeza', 0)*100, 1)}%)")
-        y -= 14
+    c.setFillColorRGB(0, 0, 0)
+    
+    ejercicios_texto = evaluacion.get('sugerencia_ejercicios', 'No disponible')
+    for line in _formatear_parrafo_pdf(ejercicios_texto, 80):
+        c.drawString(60, y, line)
+        y -= 12
         if y < 80:
             c.showPage()
             y = height - 60
-    y -= 10
-
+            c.setFont("Helvetica", 10)
+    y -= 15
+    
+    # =========================================================
+    # PUNTAJES MFCC (Rendimiento por fonema)
+    # =========================================================
+    if y < 150:
+        c.showPage()
+        y = height - 60
+    
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Plan de intervención:")
-    y -= 20
-    c.setFont("Helvetica", 10)
-    for exercise in informe['plan'][:15]:
-        c.drawString(60, y, f"- {exercise.get('nombre', 'Ejercicio')} (Nivel: {exercise.get('nivel_dificultad', '')})")
-        y -= 14
+    c.drawString(50, y, "RENDIMIENTO POR FONEMA (Análisis Acústico MFCC)")
+    y -= 18
+    c.setFont("Helvetica", 9)
+    
+    # Cabecera de la tabla
+    c.drawString(50, y, "Fonema")
+    c.drawString(180, y, "Puntaje")
+    c.drawString(280, y, "Interpretación")
+    y -= 12
+    
+    for score in mfcc_scores[:15]:
+        valor = score['valor_obtenido']
+        descripcion = score['descripcion'][:30] if score['descripcion'] else "Fonema"
+        
+        if valor >= 0.7:
+            interpretacion = "✅ Correcto"
+        elif valor >= 0.4:
+            interpretacion = "⚠️ En desarrollo"
+        else:
+            interpretacion = "🔴 Requiere refuerzo"
+        
+        c.drawString(50, y, descripcion)
+        c.drawString(180, y, f"{valor*100:.1f}%")
+        c.drawString(280, y, interpretacion)
+        y -= 12
+        
         if y < 80:
             c.showPage()
             y = height - 60
-    y -= 10
-
+            c.setFont("Helvetica", 9)
+            c.drawString(50, y, "Fonema")
+            c.drawString(180, y, "Puntaje")
+            c.drawString(280, y, "Interpretación")
+            y -= 12
+    
+    y -= 15
+    
+    # =========================================================
+    # RECOMENDACIONES PARA EL TUTOR
+    # =========================================================
+    if y < 150:
+        c.showPage()
+        y = height - 60
+    
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Puntajes MFCC clave:")
-    y -= 20
+    c.drawString(50, y, "RECOMENDACIONES PARA EL TUTOR")
+    y -= 18
     c.setFont("Helvetica", 10)
-    for score in informe['mfcc_scores'][:10]:
-        c.drawString(60, y, f"- {score.get('descripcion', '')}: {round(score.get('score', 0), 3)}")
-        y -= 14
-        if y < 80:
-            c.showPage()
-            y = height - 60
-
+    
+    recomendaciones = [
+        "1. Realizar los ejercicios recomendados en casa con una frecuencia de 3-4 veces por semana.",
+        "2. Mantener un ambiente tranquilo y sin distracciones durante las sesiones de práctica.",
+        "3. Celebrar los logros del niño, incluso los pequeños avances.",
+        "4. Consultar con un especialista si persisten las dificultades después de 3 meses de práctica.",
+        "5. Utilizar el chatbot 'Asistente Clínico' para resolver dudas sobre los resultados."
+    ]
+    
+    for rec in recomendaciones:
+        for line in _formatear_parrafo_pdf(rec, 85):
+            c.drawString(60, y, line)
+            y -= 12
+            if y < 80:
+                c.showPage()
+                y = height - 60
+                c.setFont("Helvetica", 10)
+        y -= 4
+    
+    # =========================================================
+    # PIE DE PÁGINA
+    # =========================================================
     c.showPage()
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.drawString(50, 50, "Documento generado automáticamente por el Sistema Experto Fonoaudiológico")
+    c.drawString(50, 40, "Este informe no sustituye la consulta con un especialista.")
+    c.drawString(50, 30, f"Reporte ID: {id_evaluacion} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    
     c.save()
     return pdf_path
+
+
+def _formatear_parrafo_pdf(texto: str, ancho: int = 80) -> list:
+    """Formatea un texto largo en líneas de máximo 'ancho' caracteres para PDF."""
+    if not texto:
+        return ["No disponible"]
+    
+    palabras = texto.split()
+    lineas = []
+    linea_actual = ""
+    
+    for palabra in palabras:
+        if len(linea_actual) + len(palabra) + 1 <= ancho:
+            if linea_actual:
+                linea_actual += " " + palabra
+            else:
+                linea_actual = palabra
+        else:
+            if linea_actual:
+                lineas.append(linea_actual)
+            linea_actual = palabra
+    
+    if linea_actual:
+        lineas.append(linea_actual)
+    
+    return lineas
 
 
 @router.get("/generar-reporte-pdf/{id_nino}/{id_evaluacion}")
@@ -554,3 +926,4 @@ async def generar_reporte_pdf(id_nino: int, id_evaluacion: int):
     except Exception as e:
         logger.error(f"Error generando reporte PDF para id_nino={id_nino}, id_evaluacion={id_evaluacion}: {e}")
         raise HTTPException(status_code=500, detail="No se pudo generar el reporte PDF")
+# fin nuevo endpoint para generar PDF clínico completo 26/04/2026

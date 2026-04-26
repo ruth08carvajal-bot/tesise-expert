@@ -69,27 +69,67 @@ const TutorDashboard = ({ usuario, onLogout }) => {
         cargarNinos(); 
     };
 
-    // --- FUNCIONES PARA MANEJAR EVALUACIÓN Y RESULTADOS ---
+    // --- FUNCIONES PARA MANEJAR EVALUACIÓN Y RESULTADOS ---INICIO  26/04/2026
     const handleIniciarEvaluacion = async (nino) => {
         try {
             const response = await iniciarEvaluacion(nino.id_nino);
+            
+            // CASO 1: Error (menos de 3 meses desde última evaluación)
+            if (response.status === "error" || response.puede_evaluar === false) {
+                // Mostrar mensaje de advertencia
+                setMensaje({ 
+                    texto: response.mensaje, 
+                    tipo: 'warning' 
+                });
+                
+                // Ofrecer ver resultados anteriores
+                if (response.id_evaluacion_existente) {
+                    const quiereVer = window.confirm(
+                        `${response.mensaje}\n\n¿Desea ver los resultados de la evaluación anterior?`
+                    );
+                    if (quiereVer) {
+                        setSelectedNino(nino);
+                        setIdEvaluacionActual(response.id_evaluacion_existente);
+                        setShowResultados(true);
+                    }
+                }
+                return;
+            }
+            
+            // CASO 2: Éxito (primera evaluación o reevaluación)
             setSelectedNino(nino);
             setIdEvaluacionActual(response.id_evaluacion);
             setShowEvaluacion(true);
+            
+            // Mostrar mensaje de éxito
+            setMensaje({ 
+                texto: response.mensaje, 
+                tipo: 'success' 
+            });
+            
+            // Limpiar mensaje después de 3 segundos
+            setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
+            
         } catch (error) {
             console.error('Error al iniciar evaluación:', error);
             setMensaje({ texto: "Error al iniciar la sesión de evaluación", tipo: 'error' });
         }
-    };
+    };// --- FUNCIONES PARA MANEJAR EVALUACIÓN Y RESULTADOS ---FIN  26/04/2026
 
     const handleVerResultados = (nino) => {
-        if (!nino.ultima_eval_id) {
-            setMensaje({ texto: 'No hay evaluaciones previas disponibles para este niño.', tipo: 'error' });
-            return;
+        // Si el niño tiene evaluaciones guardadas en el estado (del endpoint mejorado)
+        if (nino.evaluaciones && nino.evaluaciones.length > 0) {
+            setSelectedNino(nino);
+            setEvaluacionesDisponibles(JSON.parse(nino.evaluaciones));
+            setMostrarSelectorEvaluacion(true);
+        } else if (nino.ultima_eval_id) {
+            // Fallback: mostrar solo la última
+            setSelectedNino(nino);
+            setIdEvaluacionActual(nino.ultima_eval_id);
+            setShowResultados(true);
+        } else {
+            setMensaje({ texto: 'No hay evaluaciones previas para este niño.', tipo: 'error' });
         }
-        setSelectedNino(nino);
-        setIdEvaluacionActual(nino.ultima_eval_id);
-        setShowResultados(true);
     };
 
     // --- RENDERIZADO CONDICIONAL ---
@@ -175,14 +215,29 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                             <h4>{nino.nombre}</h4>
                             <p style={styles.info}>Escolaridad: {nino.escolaridad}</p>
                             
+                            {/* En la sección de cada niño, modificar los botones */}
                             <div style={styles.actions}>
                                 {!nino.anamnesis_completa ? (
-                                    <button style={styles.btnAction} onClick={() => handleAnamnesis(nino.id_nino)}>Realizar Anamnesis</button>
+                                    <button style={styles.btnAction} onClick={() => handleAnamnesis(nino.id_nino)}>
+                                        📋 Realizar Anamnesis
+                                    </button>
                                 ) : (
-                                    <button style={styles.btnEval} onClick={() => handleIniciarEvaluacion(nino)}>Iniciar Evaluación</button>
-                                )}
-                                {nino.tiene_evaluaciones && (
-                                    <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>Ver Resultados</button>
+                                    <>
+                                        {nino.tiene_evaluaciones === 0 ? (
+                                            <button style={styles.btnEval} onClick={() => handleIniciarEvaluacion(nino)}>
+                                                🎯 Iniciar Primera Evaluación
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button style={styles.btnEval} onClick={() => handleIniciarEvaluacion(nino)}>
+                                                    🔄 Iniciar Reevaluación (mínimo 3 meses)
+                                                </button>
+                                                <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>
+                                                    📊 Ver Últimos Resultados
+                                                </button>
+                                            </>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
