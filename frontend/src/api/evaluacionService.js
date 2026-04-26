@@ -27,3 +27,8 @@ export const iniciarEvaluacion = async (id_nino) => {
     });
     return response.data;
 };
+
+export const obtenerResultadosDiagnostico = async (id_nino, id_evaluacion) => {
+    const response = await axios.get(`${API_URL}/ejecutar-diagnostico/${id_nino}/${id_evaluacion}`);
+    return response.data;
+};

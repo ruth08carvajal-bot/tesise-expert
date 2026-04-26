@@ -1,28 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { obtenerResultadosDiagnostico } from '../../api/evaluacionService';
 
 const ResultadosDiagnostico = ({ idNino, idEvaluacion }) => {
     const [diagnosticos, setDiagnosticos] = useState([]);
     const [cargando, setCargando] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const obtenerResultados = async () => {
-            try {
-                // Sincronizado con el endpoint del controlador
-                //const res = await axios.get(`http://localhost:8003/ejecutar-diagnostico/${idNino}/${idEvaluacion}`);
-                // ResultadosDiagnostico.jsx - Línea 12
-                const res = await axios.get(`http://localhost:8003/evaluacion/ejecutar-diagnostico/${idNino}/${idEvaluacion}`);
-                setDiagnosticos(res.data.diagnosticos);
+            if (!idNino || !idEvaluacion) {
+                setError('Falta información de evaluación para mostrar resultados.');
                 setCargando(false);
+                return;
+            }
+
+            try {
+                const res = await obtenerResultadosDiagnostico(idNino, idEvaluacion);
+                setDiagnosticos(res.diagnosticos || []);
             } catch (error) {
-                console.error("Error al obtener diagnóstico", error);
+                console.error('Error al obtener diagnóstico', error);
+                setError('No se pudo obtener el diagnóstico. Intenta de nuevo más tarde.');
+            } finally {
                 setCargando(false);
             }
         };
-        if (idNino && idEvaluacion) obtenerResultados();
+
+        obtenerResultados();
     }, [idNino, idEvaluacion]);
 
     if (cargando) return <div style={{textAlign: 'center', padding: '50px'}}>Procesando inferencia clínica...</div>;
+    if (error) return <div style={{textAlign: 'center', padding: '50px', color: '#b71c1c'}}>{error}</div>;
 
     return (
         <div style={{ padding: '30px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
@@ -33,37 +40,44 @@ const ResultadosDiagnostico = ({ idNino, idEvaluacion }) => {
                 </p>
             </div>
             
-            {diagnosticos.length > 0 ? (
-                diagnosticos.map((diag, index) => (
-                    <div key={index} style={cardStyle}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, color: '#1565c0' }}>{diag.nombre_diag}</h3>
-                            <span style={badgeStyle(diag.fc_total)}>
-                                CF: {(diag.fc_total * 100).toFixed(2)}%
-                            </span>
+            <div>
+                {diagnosticos.filter((diag) => diag.fc_total > 0.5).length > 0 ? (
+                    diagnosticos
+                        .filter((diag) => diag.fc_total > 0.5)
+                        .map((diag, index) => (
+                            <div key={index} style={cardStyle}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3 style={{ margin: 0, color: '#1565c0' }}>{diag.nombre_diag}</h3>
+                                    <span style={badgeStyle(diag.fc_total)}>
+                                        CF: {(diag.fc_total * 100).toFixed(2)}%
+                                    </span>
+                                </div>
+                            
+                            <div style={{ marginTop: '15px' }}>
+                                <p style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '5px' }}>
+                                    Justificación Técnica (Trazas de Inferencia):
+                                </p>
+                                <ul style={{ fontSize: '0.85rem', color: '#555', paddingLeft: '20px' }}>
+                                    {diag.explicacion.map((traza, i) => (
+                                        <li key={i} style={{ marginBottom: '3px' }}>{traza}</li>
+                                    ))}
+                                </ul>
+                            </div>
                         </div>
-                        
-                        <div style={{ marginTop: '15px' }}>
-                            <p style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '5px' }}>
-                                Justificación Técnica (Trazas de Inferencia):
-                            </p>
-                            <ul style={{ fontSize: '0.85rem', color: '#555', paddingLeft: '20px' }}>
-                                {diag.explicacion.map((traza, i) => (
-                                    <li key={i} style={{ marginBottom: '3px' }}>{traza}</li>
-                                ))}
-                            </ul>
-                        </div>
+                    ))
+                ) : (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#7f8c8d' }}>
+                        <p>No se encontraron evidencias suficientes para determinar un diagnóstico fonológico.</p>
                     </div>
-                ))
-            ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#7f8c8d' }}>
-                    <p>No se encontraron evidencias suficientes para determinar un diagnóstico fonológico.</p>
-                </div>
-            )}
+                )}
+            </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => window.print()} style={btnStyle}>
-                    🖨️ Descargar Reporte PDF
+                <button
+                    onClick={() => window.open(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${idEvaluacion}`, '_blank')}
+                    style={btnStyle}
+                >
+                    📄 Generar Reporte PDF
                 </button>
             </div>
         </div>

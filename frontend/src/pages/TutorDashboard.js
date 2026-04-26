@@ -83,9 +83,12 @@ const TutorDashboard = ({ usuario, onLogout }) => {
     };
 
     const handleVerResultados = (nino) => {
+        if (!nino.ultima_eval_id) {
+            setMensaje({ texto: 'No hay evaluaciones previas disponibles para este niño.', tipo: 'error' });
+            return;
+        }
         setSelectedNino(nino);
-        // Aquí pasas el ID de la última evaluación que tenga el niño
-        setIdEvaluacionActual(nino.ultima_eval_id || 1); 
+        setIdEvaluacionActual(nino.ultima_eval_id);
         setShowResultados(true);
     };
 
@@ -179,7 +182,7 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                                     <button style={styles.btnEval} onClick={() => handleIniciarEvaluacion(nino)}>Iniciar Evaluación</button>
                                 )}
                                 {nino.tiene_evaluaciones && (
-                                    <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>Módulo de Explicación</button>
+                                    <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>Ver Resultados</button>
                                 )}
                             </div>
                         </div>

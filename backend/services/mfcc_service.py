@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 class MFCCService:
     def __init__(self):
-        self.ALPHA = 15.0 
         self.SR = 16000
         self.PATH_PATRONES = "data/patrones"
         
@@ -21,6 +20,15 @@ class MFCCService:
             't': 6, 'd': 7, 'p': 8, 'b': 9, 'g': 10,
             'f': 14, 'ch': 16, 'ere': 1,
         }
+
+    def calcular_alpha_por_edad(self, edad: int) -> float:
+        """Auditoría MFCC: alpha óptimo basado en edad del niño"""
+        if edad < 5:
+            return 5.0  # Más estricto para niños pequeños
+        elif edad < 7:
+            return 10.0  # Moderado
+        else:
+            return 15.0  # Más permisivo para mayores
 
     def extraer_vector_mfcc(self, path: str):
         try:
@@ -51,9 +59,9 @@ class MFCCService:
             traceback.print_exc()
             raise e
 
-    def calcular_similitud_difusa(self, v_nino, v_patron):
+    def calcular_similitud_difusa(self, v_nino, v_patron, alpha):
         distancia = np.linalg.norm(v_patron - v_nino)
-        similitud = np.exp(-distancia / self.ALPHA)
+        similitud = np.exp(-distancia / alpha)
         return float(similitud)
 #puedes que aqui este el error pot id_ev
 #    def procesar_evaluacion(self, audio_nino_path: str, fonema: str, id_ev: int):
@@ -81,7 +89,10 @@ class MFCCService:
 #                conn.commit()
 #        
 #        return fc_obtenido
-    def procesar_evaluacion(self, audio_nino_path: str, fonema: str, id_ev: int):
+    def procesar_evaluacion(self, audio_nino_path: str, fonema: str, id_ev: int, edad: int):
+            # 1. Calcular alpha basado en edad
+            alpha = self.calcular_alpha_por_edad(edad)
+            
             # 1. Intentar cargar el .npy (vector ya procesado) o el .wav (audio crudo)
             patron_npy = os.path.join(self.PATH_PATRONES, f"{fonema}.npy")
             patron_wav = os.path.join(self.PATH_PATRONES, f"{fonema}.wav")
@@ -100,7 +111,7 @@ class MFCCService:
             v_nino = self.extraer_vector_mfcc(audio_nino_path)
             
             # 3. Cálculo de Similitud
-            fc_obtenido = self.calcular_similitud_difusa(v_nino, v_patron)
+            fc_obtenido = self.calcular_similitud_difusa(v_nino, v_patron, alpha)
             
             # 4. CORRECCIÓN DEL MAPEO: 
             # Si 'fonema' ya es un número (ej. "1"), lo usamos directamente.
@@ -110,7 +121,7 @@ class MFCCService:
             else:
                 id_hecho = self.MAPEO_FONEMAS.get(fonema, 0)
 
-            logger.debug(f"DEBUG MFCC: Fonema={fonema}, ID_Hecho={id_hecho}, Similitud={fc_obtenido}")
+            logger.debug(f"DEBUG MFCC: Fonema={fonema}, ID_Hecho={id_hecho}, Similitud={fc_obtenido}, Alpha={alpha}")
 
             if id_hecho > 0:
                 with db_admin.obtener_conexion() as conn:
