@@ -57,9 +57,54 @@ async def listar_ninos(id_tut: int):
             SELECT n.id_nino, n.nombre, n.f_nac, n.genero, n.escolaridad, n.parentesco,
                    COALESCE((SELECT COUNT(*) FROM anamnesis_hechos a WHERE a.id_nino = n.id_nino), 0) as anamnesis_completa,
                    COALESCE((SELECT COUNT(*) FROM evaluacion_sesion e WHERE e.id_nino = n.id_nino), 0) as tiene_evaluaciones,
-                   COALESCE((SELECT MAX(id_ev) FROM evaluacion_sesion e WHERE e.id_nino = n.id_nino), 0) as ultima_eval_id
+                   COALESCE((SELECT MAX(id_ev) FROM evaluacion_sesion e WHERE e.id_nino = n.id_nino), 0) as ultima_eval_id,
+                   # inicio subquery evaluaciones 26-06-2024
+                   (
+                        SELECT JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'id_ev', e.id_ev, 
+                                'fecha', e.fecha_eval, 
+                                'tipo', e.tipo_evaluacion,
+                                'fecha_formateada', DATE_FORMAT(e.fecha_eval, '%d/%m/%Y')
+                            )
+                        ) 
+                        FROM evaluacion_sesion e 
+                        WHERE e.id_nino = n.id_nino
+                        ORDER BY e.fecha_eval DESC
+                    ) as evaluaciones
+                    # fin subquery evaluaciones 26-06-2024
             FROM nino n 
             WHERE n.id_tut = %s
         """
         cursor.execute(query, (id_tut,))
         return cursor.fetchall()
+        # inicio Procesar cada niño para calcular si puede ser reevaluado 26-06-2024
+        from datetime import date
+        from controllers.ninos_controller import calcular_edad
+        
+        for nino in ninos:
+            # Calcular meses desde última evaluación
+            if nino.get('ultima_eval_id') and nino['ultima_eval_id'] > 0:
+                cursor.execute("""
+                    SELECT fecha_eval FROM evaluacion_sesion 
+                    WHERE id_ev = %s
+                """, (nino['ultima_eval_id'],))
+                ultima = cursor.fetchone()
+                if ultima and ultima['fecha_eval']:
+                    fecha_ultima = ultima['fecha_eval']
+                    hoy = date.today()
+                    meses_diferencia = (hoy.year - fecha_ultima.year) * 12 + (hoy.month - fecha_ultima.month)
+                    nino['meses_desde_ultima_eval'] = meses_diferencia
+                    nino['puede_reevaluar'] = meses_diferencia >= 3
+                    nino['meses_restantes'] = max(0, 3 - meses_diferencia)
+                else:
+                    nino['puede_reevaluar'] = True
+                    nino['meses_desde_ultima_eval'] = 0
+                    nino['meses_restantes'] = 0
+            else:
+                nino['puede_reevaluar'] = True
+                nino['meses_desde_ultima_eval'] = 0
+                nino['meses_restantes'] = 0
+        
+        return ninos
+    # fin Procesar cada niño para calcular si puede ser reevaluado 26-06-2024

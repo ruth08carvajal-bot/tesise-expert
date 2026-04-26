@@ -927,3 +927,56 @@ async def generar_reporte_pdf(id_nino: int, id_evaluacion: int):
         logger.error(f"Error generando reporte PDF para id_nino={id_nino}, id_evaluacion={id_evaluacion}: {e}")
         raise HTTPException(status_code=500, detail="No se pudo generar el reporte PDF")
 # fin nuevo endpoint para generar PDF clínico completo 26/04/2026
+# inicio nuevo endpoint para obtener historial de evaluaciones y rendimiento histórico 26/04/2026
+@router.get("/historial-evaluaciones/{id_nino}")
+async def obtener_historial_evaluaciones(id_nino: int):
+    """Obtiene el historial de evaluaciones de un niño para gráficos de progreso."""
+    try:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+            
+            # Obtener todas las evaluaciones del niño
+            cursor.execute("""
+                SELECT id_ev, fecha_eval, tipo_evaluacion,
+                       DATE_FORMAT(fecha_eval, '%d/%m/%Y') as fecha_formateada
+                FROM evaluacion_sesion
+                WHERE id_nino = %s
+                ORDER BY fecha_eval ASC
+            """, (id_nino,))
+            evaluaciones = cursor.fetchall()
+            
+            # Para cada evaluación, calcular puntaje promedio de MFCC
+            for ev in evaluaciones:
+                cursor.execute("""
+                    SELECT AVG(valor_obtenido) as promedio
+                    FROM memoria_trabajo
+                    WHERE id_ev = %s AND fuente = 'MFCC'
+                """, (ev['id_ev'],))
+                resultado = cursor.fetchone()
+                ev['puntaje_promedio'] = float(resultado['promedio']) if resultado and resultado['promedio'] else 0
+            
+            # Obtener mejores y peores fonemas (promedio histórico)
+            cursor.execute("""
+                SELECT bh.descripcion, rh.promedio
+                FROM rendimiento_hecho rh
+                JOIN base_hechos bh ON rh.id_hecho = bh.id_hecho
+                WHERE rh.id_nino = %s AND rh.promedio IS NOT NULL
+                ORDER BY rh.promedio DESC
+            """, (id_nino,))
+            rendimientos = cursor.fetchall()
+            
+            mejores_fonemas = rendimientos[:5]  # Top 5
+            peores_fonemas = rendimientos[-5:] if len(rendimientos) >= 5 else []  # Bottom 5
+            peores_fonemas = [p for p in peores_fonemas if p['promedio'] < 0.6]
+            
+            return {
+                "status": "success",
+                "evaluaciones": evaluaciones,
+                "mejores_fonemas": mejores_fonemas,
+                "peores_fonemas": peores_fonemas
+            }
+            
+    except Exception as e:
+        logger.error(f"Error obteniendo historial para niño {id_nino}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+# fin nuevo endpoint para obtener historial de evaluaciones y rendimiento histórico 26/04/2026

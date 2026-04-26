@@ -4,6 +4,8 @@ import AnamnesisForm from './AnamnesisForm';
 import EvaluacionFonetica from '../components/Evaluacion/EvaluacionFonetica';
 import ResultadosDiagnostico from '../components/Evaluacion/ResultadosDiagnostico';
 import { iniciarEvaluacion } from '../api/evaluacionService';
+import GraficoProgreso from '../components/Evaluacion/GraficoProgreso';
+import ModuloExplicativo from '../components/Explicacion/ModuloExplicativo';
 
 const TutorDashboard = ({ usuario, onLogout }) => {
     const [ninos, setNinos] = useState([]);
@@ -14,10 +16,17 @@ const TutorDashboard = ({ usuario, onLogout }) => {
     const [showAnamnesis, setShowAnamnesis] = useState(false);
     const [selectedNino, setSelectedNino] = useState(null);
 
-    // --- NUEVOS ESTADOS PARA EVALUACIÓN ---
+    // Estados para evaluación
     const [showEvaluacion, setShowEvaluacion] = useState(false);
     const [showResultados, setShowResultados] = useState(false);
     const [idEvaluacionActual, setIdEvaluacionActual] = useState(null);
+    
+    // Estados para selector de evaluaciones
+    const [mostrarSelectorEvaluacion, setMostrarSelectorEvaluacion] = useState(false);
+    const [evaluacionesDisponibles, setEvaluacionesDisponibles] = useState([]);
+    // nuevo estado para explicación de resultados 26/04/2026
+    const [showExplicacion, setShowExplicacion] = useState(false);
+    const [ninoParaExplicacion, setNinoParaExplicacion] = useState(null);
 
     const cargarNinos = useCallback(async () => {
         if (!usuario || !usuario.id_tut) {
@@ -52,11 +61,9 @@ const TutorDashboard = ({ usuario, onLogout }) => {
     };
 
     const handleAnamnesis = (id_nino) => {
-        console.log('handleAnamnesis called with id_nino:', id_nino);
         const nino = ninos.find(n => String(n.id_nino) === String(id_nino));
-        console.log('Found nino:', nino);
         if (!nino) {
-            console.error('Niño seleccionado no encontrado:', id_nino, ninos);
+            console.error('Niño seleccionado no encontrado:', id_nino);
             return;
         }
         setSelectedNino(nino);
@@ -69,20 +76,13 @@ const TutorDashboard = ({ usuario, onLogout }) => {
         cargarNinos(); 
     };
 
-    // --- FUNCIONES PARA MANEJAR EVALUACIÓN Y RESULTADOS ---INICIO  26/04/2026
     const handleIniciarEvaluacion = async (nino) => {
         try {
             const response = await iniciarEvaluacion(nino.id_nino);
             
-            // CASO 1: Error (menos de 3 meses desde última evaluación)
             if (response.status === "error" || response.puede_evaluar === false) {
-                // Mostrar mensaje de advertencia
-                setMensaje({ 
-                    texto: response.mensaje, 
-                    tipo: 'warning' 
-                });
+                setMensaje({ texto: response.mensaje, tipo: 'warning' });
                 
-                // Ofrecer ver resultados anteriores
                 if (response.id_evaluacion_existente) {
                     const quiereVer = window.confirm(
                         `${response.mensaje}\n\n¿Desea ver los resultados de la evaluación anterior?`
@@ -96,34 +96,25 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                 return;
             }
             
-            // CASO 2: Éxito (primera evaluación o reevaluación)
             setSelectedNino(nino);
             setIdEvaluacionActual(response.id_evaluacion);
             setShowEvaluacion(true);
             
-            // Mostrar mensaje de éxito
-            setMensaje({ 
-                texto: response.mensaje, 
-                tipo: 'success' 
-            });
-            
-            // Limpiar mensaje después de 3 segundos
+            setMensaje({ texto: response.mensaje, tipo: 'success' });
             setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
             
         } catch (error) {
             console.error('Error al iniciar evaluación:', error);
             setMensaje({ texto: "Error al iniciar la sesión de evaluación", tipo: 'error' });
         }
-    };// --- FUNCIONES PARA MANEJAR EVALUACIÓN Y RESULTADOS ---FIN  26/04/2026
+    };
 
     const handleVerResultados = (nino) => {
-        // Si el niño tiene evaluaciones guardadas en el estado (del endpoint mejorado)
         if (nino.evaluaciones && nino.evaluaciones.length > 0) {
             setSelectedNino(nino);
             setEvaluacionesDisponibles(JSON.parse(nino.evaluaciones));
             setMostrarSelectorEvaluacion(true);
         } else if (nino.ultima_eval_id) {
-            // Fallback: mostrar solo la última
             setSelectedNino(nino);
             setIdEvaluacionActual(nino.ultima_eval_id);
             setShowResultados(true);
@@ -132,7 +123,24 @@ const TutorDashboard = ({ usuario, onLogout }) => {
         }
     };
 
-    // --- RENDERIZADO CONDICIONAL ---
+    const handleSeleccionarEvaluacion = (id_ev) => {
+        setIdEvaluacionActual(id_ev);
+        setMostrarSelectorEvaluacion(false);
+        setShowResultados(true);
+    };
+    // inicio nuevo handler para explicación de resultados 26/04/2026
+    const handleExplicacion = (nino) => {
+        if (!nino.ultima_eval_id) {
+            setMensaje({ texto: 'No hay evaluaciones previas para explicar.', tipo: 'error' });
+            return;
+        }
+        setNinoParaExplicacion(nino);
+        setShowExplicacion(true);
+    }; // fin nuevo handler para explicación de resultados 26/04/2026
+
+    // =========================================================
+    // RENDERIZADO CONDICIONAL
+    // =========================================================
 
     if (showAnamnesis) {
         return (
@@ -157,6 +165,29 @@ const TutorDashboard = ({ usuario, onLogout }) => {
         );
     }
 
+    if (mostrarSelectorEvaluacion) {
+        return (
+            <div style={styles.container}>
+                <button style={styles.btnAction} onClick={() => setMostrarSelectorEvaluacion(false)}>⬅ Volver</button>
+                <div style={styles.card}>
+                    <h3>Evaluaciones de {selectedNino?.nombre}</h3>
+                    <p>Seleccione qué evaluación desea ver:</p>
+                    <div style={styles.evaluacionesList}>
+                        {evaluacionesDisponibles.map((evalItem, idx) => (
+                            <button
+                                key={idx}
+                                style={styles.evaluacionBtn}
+                                onClick={() => handleSeleccionarEvaluacion(evalItem.id_ev)}
+                            >
+                                {evalItem.tipo} - {evalItem.fecha_formateada || evalItem.fecha}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (showResultados) {
         return (
             <div style={styles.container}>
@@ -168,7 +199,24 @@ const TutorDashboard = ({ usuario, onLogout }) => {
             </div>
         );
     }
+    // MODAL DE EXPLICACIÓN (NUEVO) 26/04/26
+    if (showExplicacion && ninoParaExplicacion) {
+        return (
+            <ModuloExplicativo
+                idNino={ninoParaExplicacion.id_nino}
+                idEvaluacion={ninoParaExplicacion.ultima_eval_id}
+                nombreNino={ninoParaExplicacion.nombre}
+                onClose={() => {
+                    setShowExplicacion(false);
+                    setNinoParaExplicacion(null);
+                }}
+            />
+        );
+    }// fin MODAL DE EXPLICACIÓN (NUEVO) 26/04/26
 
+    // =========================================================
+    // RENDERIZADO PRINCIPAL DEL DASHBOARD
+    // =========================================================
     return (
         <div style={styles.container}>
             <header style={styles.header}>
@@ -178,7 +226,11 @@ const TutorDashboard = ({ usuario, onLogout }) => {
             </header>
 
             {mensaje.texto && (
-                <div style={{...styles.mensaje, backgroundColor: mensaje.tipo === 'success' ? '#d4edda' : '#f8d7da', color: mensaje.tipo === 'success' ? '#155724' : '#721c24'}}>
+                <div style={{
+                    ...styles.mensaje, 
+                    backgroundColor: mensaje.tipo === 'success' ? '#d4edda' : mensaje.tipo === 'warning' ? '#fff3cd' : '#f8d7da', 
+                    color: mensaje.tipo === 'success' ? '#155724' : mensaje.tipo === 'warning' ? '#856404' : '#721c24'
+                }}>
                     {mensaje.texto}
                 </div>
             )}
@@ -215,7 +267,25 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                             <h4>{nino.nombre}</h4>
                             <p style={styles.info}>Escolaridad: {nino.escolaridad}</p>
                             
-                            {/* En la sección de cada niño, modificar los botones */}
+                            {/* INDICADOR DE REEVALUACIÓN */}
+                            {nino.tiene_evaluaciones > 0 && nino.puede_reevaluar === false && (
+                                <div style={styles.alertaReevaluacion}>
+                                    ⏳ Próxima reevaluación en {nino.meses_restantes || 3} meses
+                                    <div style={styles.progressBarContainer}>
+                                        <div style={{
+                                            ...styles.progressBarFill,
+                                            width: `${((3 - (nino.meses_restantes || 3)) / 3) * 100}%`
+                                        }} />
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {nino.tiene_evaluaciones > 0 && nino.puede_reevaluar === true && (
+                                <div style={styles.alertaReevaluacionLista}>
+                                    ✅ ¡Ya puede ser reevaluado!
+                                </div>
+                            )}
+                            
                             <div style={styles.actions}>
                                 {!nino.anamnesis_completa ? (
                                     <button style={styles.btnAction} onClick={() => handleAnamnesis(nino.id_nino)}>
@@ -223,23 +293,35 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                                     </button>
                                 ) : (
                                     <>
-                                        {nino.tiene_evaluaciones === 0 ? (
-                                            <button style={styles.btnEval} onClick={() => handleIniciarEvaluacion(nino)}>
-                                                🎯 Iniciar Primera Evaluación
-                                            </button>
-                                        ) : (
+                                        <button 
+                                            style={nino.puede_reevaluar !== false ? styles.btnEval : styles.btnEvalDisabled}
+                                            onClick={() => (nino.puede_reevaluar !== false) && handleIniciarEvaluacion(nino)}
+                                            disabled={nino.puede_reevaluar === false}
+                                        >
+                                            {nino.tiene_evaluaciones === 0 ? '🎯 Iniciar Evaluación' : '🔄 Iniciar Reevaluación'}
+                                        </button>
+                                        {nino.tiene_evaluaciones > 0 && (
                                             <>
-                                                <button style={styles.btnEval} onClick={() => handleIniciarEvaluacion(nino)}>
-                                                    🔄 Iniciar Reevaluación (mínimo 3 meses)
-                                                </button>
-                                                <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>
-                                                    📊 Ver Últimos Resultados
-                                                </button>
+                                            <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>
+                                                📊 Ver Resultados
+                                            </button>
+                                            {/* NUEVO BOTÓN: Módulo Explicativo 26-04-2026*/}
+                                            <button style={styles.btnExplicacion} onClick={() => handleExplicacion(nino)}>
+                                                💬 Modulo Explicativo
+                                            </button>
                                             </>
                                         )}
                                     </>
                                 )}
                             </div>
+                            
+                            {/* GRÁFICO DE PROGRESO (colapsable) */}
+                            {nino.tiene_evaluaciones >= 2 && (
+                                <details style={styles.detailsProgreso}>
+                                    <summary style={styles.summaryProgreso}>📈 Ver progreso del niño</summary>
+                                    <GraficoProgreso idNino={nino.id_nino} />
+                                </details>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -257,14 +339,24 @@ const styles = {
     form: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
     input: { padding: '10px', borderRadius: '6px', border: '1px solid #ddd', flex: 1, minWidth: '150px' },
     btnPrimary: { padding: '10px 20px', backgroundColor: '#2c3e50', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' },
     ninoCard: { backgroundColor: '#fff', padding: '20px', borderRadius: '10px', borderLeft: '5px solid #3498db', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
     info: { fontSize: '13px', color: '#7f8c8d', margin: '5px 0 15px 0' },
     actions: { display: 'flex', flexDirection: 'column', gap: '8px' },
     btnAction: { backgroundColor: '#f39c12', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' },
     btnEval: { backgroundColor: '#27ae60', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' },
+    btnEvalDisabled: { backgroundColor: '#95a5a6', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'not-allowed' },
     btnExplica: { backgroundColor: '#8e44ad', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' },
-    btnLogout: { backgroundColor: '#e74c3c', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }
+    btnExplicacion: { backgroundColor: '#3498db', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' }, // nuevo estilo para botón de módulo explicativo 26/04/2026
+    btnLogout: { backgroundColor: '#e74c3c', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
+    alertaReevaluacion: { backgroundColor: '#fff3cd', color: '#856404', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '10px' },
+    alertaReevaluacionLista: { backgroundColor: '#d4edda', color: '#155724', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '10px' },
+    progressBarContainer: { backgroundColor: '#e0e0e0', borderRadius: '10px', height: '6px', marginTop: '8px', overflow: 'hidden' },
+    progressBarFill: { backgroundColor: '#f39c12', height: '100%', borderRadius: '10px', transition: 'width 0.5s ease' },
+    detailsProgreso: { marginTop: '15px' },
+    summaryProgreso: { cursor: 'pointer', color: '#3498db', fontSize: '13px', fontWeight: 'bold' },
+    evaluacionesList: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' },
+    evaluacionBtn: { backgroundColor: '#3498db', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' }
 };
 
 export default TutorDashboard;

@@ -43,12 +43,19 @@ class Nino(BaseModel):
 
 # --- BASE DE CONOCIMIENTO (ESTÁTICA) ---
 
+#class BaseHechos(BaseModel):
+#    id_hecho: int
+#    cod_h: str
+#    descripcion: str
+#    categoria_clinica: Optional[str] = None
+#    instrumento_origen: Optional[str] = None
 class BaseHechos(BaseModel):
     id_hecho: int
     cod_h: str
     descripcion: str
     categoria_clinica: Optional[str] = None
     instrumento_origen: Optional[str] = None
+    id_instrumento: Optional[int] = None
 
 class CatalogoDiagnosticos(BaseModel):
     id_diag: int
@@ -99,6 +106,10 @@ class MemoriaTrabajo(BaseModel):
     id_ev: int
     id_hecho: int
     valor_obtenido: float
+     # NUEVO 23/04/26
+    id_tipo_evidencia: Optional[int] = None
+    confiabilidad: float = 1.0
+    fuente: Optional[str] = None
 
 class ProgresoNino(BaseModel):
     id_progreso: Optional[int] = None
@@ -110,3 +121,24 @@ class ProgresoNino(BaseModel):
     intento_numero: int
     progreso_alcanzado: int = 0
     estado_actual: str = "iniciado"
+#nuevos campos para seguimiento detallado 23/04/26
+class TipoEvidencia(BaseModel):
+    id_tipo: int
+    nombre: str  # Test, Observacion, Tutor, Automatica
+class Instrumento(BaseModel):
+    id_instrumento: Optional[int] = None
+    nombre: str
+    tipo: Optional[str] = None
+    descripcion: Optional[str] = None
+class ReglaCompuesta(BaseModel):
+    id_regla: Optional[int] = None
+    id_diag: int
+    descripcion: Optional[str] = None
+    umbral: float
+class ReglaDetalle(BaseModel):
+    id_detalle: Optional[int] = None
+    id_regla: int
+    id_hecho: int
+    peso: float
+    operador: str  # >, <, =
+    valor: float
