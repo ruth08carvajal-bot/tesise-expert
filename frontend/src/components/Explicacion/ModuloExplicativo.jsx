@@ -55,7 +55,12 @@ const ModuloExplicativo = ({ idNino, idEvaluacion, nombreNino, onClose }) => {
 
     return (
         <>
+            {/* Modal overlay con imagen de fondo */}
             <div style={styles.modalOverlay} onClick={onClose}>
+                {/* Imagen de fondo */}
+                <div style={styles.backgroundImage} />
+                
+                {/* Contenido del modal */}
                 <div style={styles.modalContainer} onClick={(e) => e.stopPropagation()}>
                     {/* Cabecera */}
                     <div style={styles.header}>
@@ -178,21 +183,34 @@ const styles = {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1000
     },
+    backgroundImage: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: 'url("/images/fondo2.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        zIndex: 0
+    },
     modalContainer: {
-        backgroundColor: 'white',
-        borderRadius: '16px',
+        position: 'relative',
+        backgroundColor: 'rgba(170, 238, 234, 0.29)',
+        borderRadius: '20px',
         width: '90%',
         maxWidth: '650px',
         height: '85vh',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+        overflow: 'hidden',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+        zIndex: 1
     },
     header: {
         display: 'flex',
@@ -200,7 +218,6 @@ const styles = {
         alignItems: 'center',
         padding: '16px 20px',
         backgroundColor: '#2c3e50',
-        borderRadius: '16px 16px 0 0',
         color: 'white'
     },
     headerActions: {
@@ -238,7 +255,7 @@ const styles = {
         flex: 1,
         overflowY: 'auto',
         padding: '16px',
-        backgroundColor: '#f8f9fa'
+        backgroundColor: 'rgba(255, 255, 255, 0.85)'
     },
     bienvenida: {
         textAlign: 'center',
@@ -275,7 +292,7 @@ const styles = {
     sugerenciasContainer: {
         padding: '12px 16px',
         borderTop: '1px solid #dee2e6',
-        backgroundColor: 'white'
+        backgroundColor: 'rgba(255, 255, 255, 0.9)'
     },
     sugerenciasLabel: {
         margin: '0 0 8px 0',
@@ -301,7 +318,7 @@ const styles = {
         padding: '12px 16px',
         borderTop: '1px solid #dee2e6',
         gap: '10px',
-        backgroundColor: 'white'
+        backgroundColor: 'rgba(255, 255, 255, 0.9)'
     },
     input: {
         flex: 1,
@@ -326,7 +343,7 @@ const styles = {
         gap: '8px',
         padding: '12px 16px',
         borderTop: '1px solid #dee2e6',
-        backgroundColor: '#f8f9fa'
+        backgroundColor: 'rgba(255, 255, 255, 0.9)'
     },
     rapidoBoton: {
         backgroundColor: '#e8f4fd',

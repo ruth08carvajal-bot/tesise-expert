@@ -6,12 +6,17 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [rolSeleccionado, setRolSeleccionado] = useState('padres');
+    const [cargando, setCargando] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setCargando(true);
+
         if (!username || !password) {
             setError("Por favor, complete todos los campos");
+            setCargando(false);
             return;
         }
 
@@ -25,60 +30,107 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
             }
         } catch (err) {
             setError("Error de conexión con el servidor");
+        } finally {
+            setCargando(false);
         }
     };
 
     return (
         <div style={styles.container}>
-            <div style={styles.card}>
-                <h2 style={styles.title}>FonoApp Expert</h2>
-                <p style={styles.subtitle}>Sistema Experto de Apoyo Fonoaudiológico</p>
-
-                <form onSubmit={handleSubmit}>
-                    {/* USUARIO */}
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>Nombre de Usuario</label>
-                        <input 
-                            type="text" 
-                            value={username} 
-                            onChange={(e) => setUsername(e.target.value)} 
-                            style={styles.input}
-                            placeholder="Ej: Pedro Perez"
-                            required
-                        />
-                    </div>
-
-                    {/* CONTRASEÑA */}
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>Contraseña</label>
-                        <div style={styles.passwordWrapper}>
-                            <input 
-                                type={showPassword ? "text" : "password"}
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                style={styles.inputPassword}
-                                placeholder="••••••••"
-                                required
-                            />
-                            <span 
-                                onClick={() => setShowPassword(!showPassword)}
-                                style={styles.eyeIcon}
-                            >
-                                {showPassword ? "Ocultar" : "Mostrar"}
-                            </span>
+            {/* Fondo con tu imagen */}
+            <div style={styles.background}>
+                {/* Tarjeta de login a la derecha */}
+                <div style={styles.cardContainer}>
+                    <div style={styles.card}>
+                        {/* Título */}
+                        <div style={styles.header}>
+                            <h1 style={styles.title}>Las Voces del Illimani</h1>
+                            <p style={styles.subtitle}>Sistema Experto Fonoaudiológico</p>
                         </div>
+
+                        {/* Selector de rol */}
+                        <div style={styles.selectorRol}>
+                            <button
+                                onClick={() => setRolSeleccionado('padres')}
+                                style={{
+                                    ...styles.rolButton,
+                                    ...(rolSeleccionado === 'padres' ? styles.rolButtonActive : {})
+                                }}
+                            >
+                                Tutor / Padre
+                            </button>
+                            <button
+                                onClick={() => setRolSeleccionado('ninos')}
+                                style={{
+                                    ...styles.rolButton,
+                                    ...(rolSeleccionado === 'ninos' ? styles.rolButtonActive : {})
+                                }}
+                            >
+                                Niño
+                            </button>
+                        </div>
+
+                        {/* Formulario */}
+                        <form onSubmit={handleSubmit} style={styles.form}>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Usuario</label>
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    style={styles.input}
+                                    placeholder={rolSeleccionado === 'ninos' ? "Ej: Mateo" : "Ej: maria.perez"}
+                                    required
+                                />
+                            </div>
+
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Contraseña</label>
+                                <div style={styles.passwordWrapper}>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        style={styles.input}
+                                        placeholder={rolSeleccionado === 'ninos' ? "Ej: 15/03/2019" : "••••••••"}
+                                        required
+                                    />
+                                    <span
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={styles.eyeIcon}
+                                    >
+                                        {showPassword ? "Ocultar" : "Mostrar"}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {rolSeleccionado === 'ninos' && (
+                                <div style={styles.ayuda}>
+                                    Los niños usan su nombre como usuario y su fecha de nacimiento como contraseña
+                                </div>
+                            )}
+
+                            {error && <p style={styles.errorText}>{error}</p>}
+
+                            <button
+                                type="submit"
+                                style={styles.button}
+                                disabled={cargando}
+                            >
+                                {cargando ? 'Cargando...' : 'INICIAR SESIÓN'}
+                            </button>
+
+                            {rolSeleccionado === 'padres' && (
+                                <p style={styles.registerLink}>
+                                    ¿No tienes cuenta?{' '}
+                                    <span style={styles.linkAction} onClick={onGoToRegister}>
+                                        Regístrate aquí
+                                    </span>
+                                </p>
+                            )}
+                        </form>
                     </div>
-
-                    {error && <p style={styles.errorText}>{error}</p>}
-
-                    <button type="submit" style={styles.button}>
-                        Iniciar Sesión
-                    </button>
-
-                    <p style={styles.registerLink} onClick={onGoToRegister}>
-                        ¿No tiene una cuenta? <span style={styles.linkAction}>Regístrese aquí</span>
-                    </p>
-                </form>
+                </div>
             </div>
         </div>
     );
@@ -86,34 +138,80 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
 
 const styles = {
     container: {
+        width: '100%',
+        minHeight: '100vh',
+        overflow: 'hidden'
+    },
+    background: {
+        width: '100%',
+        minHeight: '100vh',
+        backgroundImage: 'url("/images/fondo.png")', // ← TU IMAGEN DE FONDO
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        position: 'relative',
         display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#f4f7f6' // Fondo neutro profesional
+        justifyContent: 'flex-end', // Tarjeta a la derecha
+        alignItems: 'center'
+    },
+    cardContainer: {
+        width: '100%',
+        maxWidth: '440px',
+        marginRight: '8%', // Separación desde la derecha
+        padding: '20px'
     },
     card: {
-        padding: '40px',
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        width: '380px',
+        backgroundColor: 'rgba(255, 255, 255, 0.70)', // Blanco con 70% opacidad
+        borderRadius: '20px',
+        padding: '35px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        backdropFilter: 'blur(2px)' // Pequeño desenfoque para integrarse con el fondo
+    },
+    header: {
         textAlign: 'center',
-        boxSizing: 'border-box'
+        marginBottom: '30px'
     },
     title: {
+        fontSize: '26px',
+        fontWeight: 'bold',
         color: '#2c3e50',
-        fontSize: '24px',
-        margin: '0 0 8px 0',
-        fontWeight: '600'
+        margin: '0 0 8px 0'
     },
     subtitle: {
-        color: '#95a5a6',
-        marginBottom: '30px',
-        fontSize: '14px'
+        fontSize: '13px',
+        color: '#7f8182',
+        margin: 0
+    },
+    selectorRol: {
+        display: 'flex',
+        gap: '12px',
+        marginBottom: '25px',
+        backgroundColor: '#f0f0f0',
+        borderRadius: '40px',
+        padding: '5px'
+    },
+    rolButton: {
+        flex: 1,
+        padding: '12px',
+        borderRadius: '35px',
+        border: 'none',
+        backgroundColor: 'transparent',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: '500',
+        color: '#7f8c8d',
+        transition: 'all 0.2s ease'
+    },
+    rolButtonActive: {
+        backgroundColor: '#2c3e50',
+        color: 'white'
+    },
+    form: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px'
     },
     inputGroup: {
-        marginBottom: '20px',
         textAlign: 'left'
     },
     label: {
@@ -125,68 +223,63 @@ const styles = {
     },
     input: {
         width: '100%',
-        padding: '12px',
-        borderRadius: '6px',
-        border: '1px solid #dcdde1',
-        outline: 'none',
+        padding: '14px',
+        borderRadius: '12px',
+        border: '1px solid #e0e0e0',
         fontSize: '14px',
-        boxSizing: 'border-box', // Clave para que midan lo mismo
-        transition: 'border-color 0.3s'
+        outline: 'none',
+        boxSizing: 'border-box',
+        transition: 'border-color 0.2s'
     },
     passwordWrapper: {
         position: 'relative',
-        width: '100%',
-        boxSizing: 'border-box'
-    },
-    inputPassword: {
-        width: '100%',
-        padding: '12px',
-        paddingRight: '65px',
-        borderRadius: '6px',
-        border: '1px solid #dcdde1',
-        outline: 'none',
-        fontSize: '14px',
-        boxSizing: 'border-box'
+        width: '100%'
     },
     eyeIcon: {
         position: 'absolute',
-        right: '12px',
+        right: '14px',
         top: '50%',
         transform: 'translateY(-50%)',
         cursor: 'pointer',
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#3498db',
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-        userSelect: 'none'
-    },
-    button: {
-        width: '100%',
-        padding: '12px',
-        backgroundColor: '#2c3e50', // Color institucional serio
-        color: '#fff',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '600',
-        marginTop: '10px',
-        transition: 'background-color 0.3s'
-    },
-    registerLink: {
-        marginTop: '25px',
-        fontSize: '13px',
-        color: '#7f8c8d'
-    },
-    linkAction: {
-        color: '#3498db',
-        cursor: 'pointer',
         fontWeight: '500'
+    },
+    ayuda: {
+        fontSize: '11px',
+        color: '#7f8c8d',
+        backgroundColor: '#f8f9fa',
+        padding: '10px',
+        borderRadius: '10px',
+        textAlign: 'center',
+        lineHeight: '1.5'
     },
     errorText: {
         color: '#e74c3c',
         fontSize: '13px',
-        marginBottom: '15px',
+        margin: 0,
+        textAlign: 'center'
+    },
+    button: {
+        padding: '14px',
+        backgroundColor: '#2c3e50',
+        color: 'white',
+        border: 'none',
+        borderRadius: '40px',
+        cursor: 'pointer',
+        fontSize: '15px',
+        fontWeight: '600',
+        transition: 'background-color 0.2s'
+    },
+    registerLink: {
+        textAlign: 'center',
+        fontSize: '12px',
+        color: '#6ec405',
+        margin: '15px 0 0'
+    },
+    linkAction: {
+        color: '#3498db',
+        cursor: 'pointer',
         fontWeight: '500'
     }
 };
