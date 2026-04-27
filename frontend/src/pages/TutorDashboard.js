@@ -4,10 +4,9 @@ import AnamnesisForm from './AnamnesisForm';
 import EvaluacionFonetica from '../components/Evaluacion/EvaluacionFonetica';
 import ResultadosDiagnostico from '../components/Evaluacion/ResultadosDiagnostico';
 import { iniciarEvaluacion } from '../api/evaluacionService';
-import GraficoProgreso from '../components/Evaluacion/GraficoProgreso';
 import ModuloExplicativo from '../components/Explicacion/ModuloExplicativo';
 
-const TutorDashboard = ({ usuario, onLogout }) => {
+const TutorDashboard = ({ usuario, onLogout, onVerProgreso }) => {
     const [ninos, setNinos] = useState([]);
     const [nuevoNino, setNuevoNino] = useState({
         nombre: '', f_nac: '', genero: 'M', escolaridad: 'Inicial', parentesco: 'Padre/Madre'
@@ -24,7 +23,8 @@ const TutorDashboard = ({ usuario, onLogout }) => {
     // Estados para selector de evaluaciones
     const [mostrarSelectorEvaluacion, setMostrarSelectorEvaluacion] = useState(false);
     const [evaluacionesDisponibles, setEvaluacionesDisponibles] = useState([]);
-    // nuevo estado para explicación de resultados 26/04/2026
+    
+    // Estado para explicación de resultados
     const [showExplicacion, setShowExplicacion] = useState(false);
     const [ninoParaExplicacion, setNinoParaExplicacion] = useState(null);
 
@@ -48,6 +48,27 @@ const TutorDashboard = ({ usuario, onLogout }) => {
 
     const handleRegister = async (e) => {
         e.preventDefault();
+        
+        // VALIDACIÓN DE EDAD (mínimo 5 años)
+        const fechaNacimiento = new Date(nuevoNino.f_nac);
+        const hoy = new Date();
+        let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+        const mesDiff = hoy.getMonth() - fechaNacimiento.getMonth();
+        
+        if (mesDiff < 0 || (mesDiff === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
+            edad--;
+        }
+        
+        if (edad < 5) {
+            setMensaje({ 
+                texto: `El niño debe tener al menos 5 años para ser evaluado. Edad actual: ${edad} años.`, 
+                tipo: 'error' 
+            });
+            setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
+            return;
+        }
+        
+        // Si pasa la validación, registrar
         try {
             await registrarNino({ ...nuevoNino, id_tut: usuario.id_tut });
             setNuevoNino({ nombre: '', f_nac: '', genero: 'M', escolaridad: 'Inicial', parentesco: 'Padre/Madre' });
@@ -128,7 +149,7 @@ const TutorDashboard = ({ usuario, onLogout }) => {
         setMostrarSelectorEvaluacion(false);
         setShowResultados(true);
     };
-    // inicio nuevo handler para explicación de resultados 26/04/2026
+
     const handleExplicacion = (nino) => {
         if (!nino.ultima_eval_id) {
             setMensaje({ texto: 'No hay evaluaciones previas para explicar.', tipo: 'error' });
@@ -136,7 +157,7 @@ const TutorDashboard = ({ usuario, onLogout }) => {
         }
         setNinoParaExplicacion(nino);
         setShowExplicacion(true);
-    }; // fin nuevo handler para explicación de resultados 26/04/2026
+    };
 
     // =========================================================
     // RENDERIZADO CONDICIONAL
@@ -199,7 +220,7 @@ const TutorDashboard = ({ usuario, onLogout }) => {
             </div>
         );
     }
-    // MODAL DE EXPLICACIÓN (NUEVO) 26/04/26
+
     if (showExplicacion && ninoParaExplicacion) {
         return (
             <ModuloExplicativo
@@ -212,7 +233,7 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                 }}
             />
         );
-    }// fin MODAL DE EXPLICACIÓN (NUEVO) 26/04/26
+    }
 
     // =========================================================
     // RENDERIZADO PRINCIPAL DEL DASHBOARD
@@ -240,6 +261,9 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                 <form onSubmit={handleRegister} style={styles.form}>
                     <input style={styles.input} placeholder="Nombre del niño" value={nuevoNino.nombre} onChange={e => setNuevoNino({...nuevoNino, nombre: e.target.value})} required />
                     <input style={styles.input} type="date" value={nuevoNino.f_nac} onChange={e => setNuevoNino({...nuevoNino, f_nac: e.target.value})} required />
+                    <p style={styles.ayudaFecha}>
+                        📅 El niño debe tener al menos 5 años para ser evaluado
+                    </p>
                     <select style={styles.input} value={nuevoNino.genero} onChange={e => setNuevoNino({...nuevoNino, genero: e.target.value})}>
                         <option value="M">Masculino</option>
                         <option value="F">Femenino</option>
@@ -302,25 +326,26 @@ const TutorDashboard = ({ usuario, onLogout }) => {
                                         </button>
                                         {nino.tiene_evaluaciones > 0 && (
                                             <>
-                                            <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>
-                                                📊 Ver Resultados
-                                            </button>
-                                            {/* NUEVO BOTÓN: Módulo Explicativo 26-04-2026*/}
-                                            <button style={styles.btnExplicacion} onClick={() => handleExplicacion(nino)}>
-                                                💬 Modulo Explicativo
-                                            </button>
+                                                <button style={styles.btnExplica} onClick={() => handleVerResultados(nino)}>
+                                                    📊 Ver Resultados
+                                                </button>
+                                                <button style={styles.btnExplicacion} onClick={() => handleExplicacion(nino)}>
+                                                    💬 Modulo Explicativo
+                                                </button>
                                             </>
                                         )}
                                     </>
                                 )}
                             </div>
                             
-                            {/* GRÁFICO DE PROGRESO (colapsable) */}
-                            {nino.tiene_evaluaciones >= 2 && (
-                                <details style={styles.detailsProgreso}>
-                                    <summary style={styles.summaryProgreso}>📈 Ver progreso del niño</summary>
-                                    <GraficoProgreso idNino={nino.id_nino} />
-                                </details>
+                            {/* Botón para ver progreso completo */}
+                            {nino.tiene_evaluaciones >= 1 && (
+                                <button 
+                                    style={styles.btnProgreso}
+                                    onClick={() => onVerProgreso(nino)}
+                                >
+                                    📈 Ver progreso completo
+                                </button>
                             )}
                         </div>
                     ))}
@@ -338,6 +363,7 @@ const styles = {
     cardTitle: { margin: '0 0 15px 0', fontSize: '18px', color: '#34495e' },
     form: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
     input: { padding: '10px', borderRadius: '6px', border: '1px solid #ddd', flex: 1, minWidth: '150px' },
+    ayudaFecha: { fontSize: '11px', color: '#6c757d', marginTop: '4px', marginBottom: '0', width: '100%' },
     btnPrimary: { padding: '10px 20px', backgroundColor: '#2c3e50', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' },
     ninoCard: { backgroundColor: '#fff', padding: '20px', borderRadius: '10px', borderLeft: '5px solid #3498db', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
@@ -347,14 +373,13 @@ const styles = {
     btnEval: { backgroundColor: '#27ae60', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' },
     btnEvalDisabled: { backgroundColor: '#95a5a6', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'not-allowed' },
     btnExplica: { backgroundColor: '#8e44ad', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' },
-    btnExplicacion: { backgroundColor: '#3498db', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' }, // nuevo estilo para botón de módulo explicativo 26/04/2026
+    btnExplicacion: { backgroundColor: '#3498db', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' },
+    btnProgreso: { backgroundColor: '#3498db', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer', marginTop: '10px', width: '100%' },
     btnLogout: { backgroundColor: '#e74c3c', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
     alertaReevaluacion: { backgroundColor: '#fff3cd', color: '#856404', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '10px' },
     alertaReevaluacionLista: { backgroundColor: '#d4edda', color: '#155724', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '10px' },
     progressBarContainer: { backgroundColor: '#e0e0e0', borderRadius: '10px', height: '6px', marginTop: '8px', overflow: 'hidden' },
     progressBarFill: { backgroundColor: '#f39c12', height: '100%', borderRadius: '10px', transition: 'width 0.5s ease' },
-    detailsProgreso: { marginTop: '15px' },
-    summaryProgreso: { cursor: 'pointer', color: '#3498db', fontSize: '13px', fontWeight: 'bold' },
     evaluacionesList: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' },
     evaluacionBtn: { backgroundColor: '#3498db', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' }
 };

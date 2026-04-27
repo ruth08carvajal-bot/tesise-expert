@@ -20,15 +20,21 @@ class MFCCService:
             't': 6, 'd': 7, 'p': 8, 'b': 9, 'g': 10,
             'f': 14, 'ch': 16, 'ere': 1,
         }
-
+#inicio modificado por edad 26-06-2024
     def calcular_alpha_por_edad(self, edad: int) -> float:
-        """Auditoría MFCC: alpha óptimo basado en edad del niño"""
-        if edad < 5:
-            return 5.0  # Más estricto para niños pequeños
-        elif edad < 7:
-            return 10.0  # Moderado
+        """
+        Alpha para similitud MFCC.
+        A mayor edad, MÁS ESTRICTO (alpha más bajo).
+        """
+        if edad < 6:
+            return 12.0   # 5 años: más permisivo
+        elif edad < 8:
+            return 9.0    # 6-7 años: moderado
+        elif edad < 10:
+            return 6.0    # 8-9 años: más estricto
         else:
-            return 15.0  # Más permisivo para mayores
+            return 4.0    # 10 años: muy estricto
+#fin modificado por edad 26-06-2024
 
     def extraer_vector_mfcc(self, path: str):
         try:

@@ -8,11 +8,22 @@ class CertezaService:
     @staticmethod
     def combinar_mycin(fc1: float, fc2: float) -> float:
         """
-        Ec. 2.7 (MYCIN): Combinación de certezas de diferentes reglas
-        para una misma conclusión.
+        Ec. 2.7 (MYCIN):Combina dos factores de certeza de la misma conclusión.
+        Fórmula MYCIN: CFcomb = CF1 + CF2 * (1 - CF1)
         """
-        # FC_combinado = FC1 + FC2 * (1 - FC1)
-        return fc1 + fc2 * (1 - fc1)
+        if fc1 == 0 and fc2 == 0:
+            return 0.0
+        
+        # Ambos positivos
+        if fc1 >= 0 and fc2 >= 0:
+            return fc1 + fc2 * (1 - fc1)
+        
+        # Ambos negativos
+        if fc1 <= 0 and fc2 <= 0:
+            return fc1 + fc2 * (1 + fc1)
+        
+        # Diferentes signos
+        return (fc1 + fc2) / (1 - min(abs(fc1), abs(fc2)))
 
     @staticmethod
     def propagar_condiciones(lista_fc_condiciones: list[float], fc_regla: float) -> float:

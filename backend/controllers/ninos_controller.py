@@ -29,6 +29,16 @@ async def registrar_nino(nino: NinoSchema):
     try:
         with db_admin.obtener_conexion() as conn:
             cursor = conn.cursor()
+             # VALIDAR EDAD (mínimo 5 años) 27-06-2024
+            from controllers.ninos_controller import calcular_edad
+            edad = calcular_edad(nino.f_nac)
+            
+            if edad < 5:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"El niño debe tener al menos 5 años. Edad actual: {edad} años."
+                )
+            # fin validación edad 27-06-2024
             # Crear usuario para el niño
             password = nino.f_nac.strftime('%d/%m/%Y')
             cursor.execute('INSERT INTO usuario (usr, psw, id_rol) VALUES (%s, %s, 3)', (nino.nombre, password))
@@ -108,3 +118,13 @@ async def listar_ninos(id_tut: int):
         
         return ninos
     # fin Procesar cada niño para calcular si puede ser reevaluado 26-06-2024
+@router.get("/nino/{id_nino}")
+async def obtener_nino(id_nino: int):
+    with db_admin.obtener_conexion() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id_nino, nombre, f_nac FROM nino WHERE id_nino = %s", (id_nino,))
+        nino = cursor.fetchone()
+        if not nino:
+            raise HTTPException(status_code=404, detail="Niño no encontrado")
+        nino['edad'] = calcular_edad(nino['f_nac'])
+        return nino

@@ -58,7 +58,27 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
         with db_admin.obtener_conexion() as conn:
             cursor = conn.cursor(dictionary=True)
             
-            # 1. Verificar si el niño tiene evaluaciones previas
+            # =========================================================
+            # PASO 1: Verificar edad del niño (mínimo 5 años)
+            # =========================================================
+            cursor.execute("SELECT f_nac, nombre FROM nino WHERE id_nino = %s", (id_nino,))
+            nino = cursor.fetchone()
+            if not nino:
+                raise HTTPException(status_code=404, detail="Niño no encontrado")
+            
+            edad = calcular_edad(nino['f_nac'])
+            
+            # 🔴 VALIDACIÓN: Edad mínima 5 años
+            if edad < 5:
+                return {
+                    "status": "error",
+                    "puede_evaluar": False,
+                    "mensaje": f"El sistema evalúa niños a partir de 5 años. {nino['nombre']} tiene {edad} años."
+                }
+            
+            # =========================================================
+            # PASO 2: Verificar si el niño tiene evaluaciones previas
+            # =========================================================
             cursor.execute("""
                 SELECT id_ev, fecha_eval, tipo_evaluacion 
                 FROM evaluacion_sesion 
@@ -69,7 +89,9 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
             
             ultima_evaluacion = cursor.fetchone()
             
-            # 2. Si NO tiene evaluaciones previas → crear primera evaluación (INICIAL)
+            # =========================================================
+            # PASO 3: Si NO tiene evaluaciones previas → crear INICIAL
+            # =========================================================
             if not ultima_evaluacion:
                 query = """
                     INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
@@ -82,13 +104,16 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                     "status": "success", 
                     "id_evaluacion": id_evaluacion,
                     "tipo": "Inicial",
-                    "mensaje": "Primera evaluación creada exitosamente"
+                    "edad": edad,
+                    "mensaje": f"Primera evaluación creada exitosamente para {nino['nombre']} ({edad} años)"
                 }
             
-            # 3. Obtener fecha de la última evaluación
+            # =========================================================
+            # PASO 4: Verificar fecha de última evaluación
+            # =========================================================
             fecha_ultima = ultima_evaluacion['fecha_eval']
             
-            #  VALIDACIÓN: Si la fecha es NULL, permitir evaluación
+            # Si la fecha es NULL, permitir evaluación
             if fecha_ultima is None:
                 query = """
                     INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
@@ -101,18 +126,22 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                     "status": "success",
                     "id_evaluacion": id_evaluacion,
                     "tipo": "Control",
-                    "mensaje": "Evaluación creada (fecha anterior no disponible)"
+                    "edad": edad,
+                    "mensaje": f"Evaluación creada para {nino['nombre']} ({edad} años)"
                 }
             
-            # 4. Convertir a date si es datetime
+            # =========================================================
+            # PASO 5: Convertir a date si es datetime y calcular meses
+            # =========================================================
             hoy = datetime.now().date()
             if isinstance(fecha_ultima, datetime):
                 fecha_ultima = fecha_ultima.date()
             
-            # 5. Calcular diferencia en meses
             meses_diferencia = (hoy.year - fecha_ultima.year) * 12 + (hoy.month - fecha_ultima.month)
             
-            # 6. Si pasaron menos de 3 meses → NO permitir nueva evaluación
+            # =========================================================
+            # PASO 6: Si pasaron menos de 3 meses → NO permitir
+            # =========================================================
             if meses_diferencia < 3:
                 return {
                     "status": "error",
@@ -120,10 +149,13 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                     "id_evaluacion_existente": ultima_evaluacion['id_ev'],
                     "fecha_ultima_evaluacion": fecha_ultima.strftime('%Y-%m-%d'),
                     "meses_restantes": 3 - meses_diferencia,
-                    "mensaje": f"El niño ya fue evaluado hace {meses_diferencia} meses. Deben pasar al menos 3 meses para una reevaluación. Puede ver los resultados de la evaluación anterior."
+                    "edad": edad,
+                    "mensaje": f"{nino['nombre']} fue evaluado hace {meses_diferencia} meses. Deben pasar al menos 3 meses para una reevaluación."
                 }
             
-            # 7. Si pasaron 3 meses o más → crear reevaluación (CONTROL)
+            # =========================================================
+            # PASO 7: Si pasaron 3 meses o más → crear reevaluación (CONTROL)
+            # =========================================================
             query = """
                 INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
                 VALUES (%s, 'Control')
@@ -136,9 +168,10 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                 "status": "success", 
                 "id_evaluacion": id_evaluacion,
                 "tipo": "Control",
+                "edad": edad,
                 "fecha_ultima_evaluacion": fecha_ultima.strftime('%Y-%m-%d'),
                 "meses_desde_ultima": meses_diferencia,
-                "mensaje": f"Reevaluación creada después de {meses_diferencia} meses"
+                "mensaje": f"Reevaluación creada para {nino['nombre']} después de {meses_diferencia} meses"
             }
             
     except Exception as e:
@@ -262,13 +295,13 @@ def obtener_edad_nino(id_nino: int) -> int:
             raise ValueError(f"Niño con id_nino={id_nino} no encontrado o sin fecha de nacimiento")
         return calcular_edad(row['f_nac'])
 
-
+#modificar edad para calcular alpha 23/04/2026
 def niveles_permitidos_por_edad(edad: int):
-    if edad < 5:
-        return ['Bajo']
-    if edad < 7:
-        return ['Bajo', 'Medio']
-    return ['Bajo', 'Medio', 'Alto']
+    if edad < 6:
+        return ['Bajo'] # 5 años: solo ejercicios básicos
+    if edad < 8:         
+        return ['Bajo', 'Medio']    # 6-7 años: solo ejercicios básicos
+    return ['Bajo', 'Medio', 'Alto']    # 8-10 años: solo ejercicios básicos
 
 
 def obtener_ejercicios_recomendados_por_reglas(id_nino: int, niveles_permitidos=None):
@@ -614,6 +647,21 @@ def construir_progreso_evaluacion(id_nino: int, id_evaluacion: int, plan: list):
 def obtener_informe_clinico(id_nino: int, id_evaluacion: int):
     edad = obtener_edad_nino(id_nino)
     resultados = motor.ejecutar_diagnostico_completo(id_nino, id_evaluacion, edad)
+    # inicio NUEVO: Construir lista de diagnósticos con trazabilidad completa para la explicación 26/04/2026
+    diagnosticos_dict = []
+    for r in resultados:
+        diag_dict = {
+            "id_diag": r.id_diag,
+            "nombre_diag": r.nombre_diag,
+            "fc_total": r.fc_total,
+            "explicacion": r.explicacion,
+            "hechos_disparadores": r.hechos_disparadores,
+            "reglas_aplicadas": r.reglas_aplicadas,
+            "confiabilidad": r.confiabilidad,
+            "pasos_razonamiento": r.pasos_razonamiento  # NUEVO: trazabilidad completa
+        }
+        diagnosticos_dict.append(diag_dict)
+    # fin NUEVO 26/04/2026
     plan_info = construir_plan_personalizado(id_nino)
     anamnesis = obtener_anamnesis_resumen(id_nino)
     mfcc_scores = obtener_mfcc_scores(id_evaluacion)

@@ -3,13 +3,14 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import TutorDashboard from './pages/TutorDashboard';
 import NinoDashboard from './pages/NinoDashboard';
+import ProgresoPage from './pages/ProgresoPage';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [vistaActual, setVistaActual] = useState('login'); // 'login' o 'registro'
+  const [vistaActual, setVistaActual] = useState('login'); // 'login', 'registro', 'progreso'
+  const [ninoProgreso, setNinoProgreso] = useState(null); // Niño seleccionado para ver progreso
 
   useEffect(() => {
-    // Verificar si hay un usuario guardado en localStorage
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
@@ -21,6 +22,18 @@ function App() {
     }
   }, []);
 
+  // Función para abrir la página de progreso
+  const verProgreso = (nino) => {
+    setNinoProgreso(nino);
+    setVistaActual('progreso');
+  };
+
+  // Función para volver al dashboard
+  const volverAlDashboard = () => {
+    setNinoProgreso(null);
+    setVistaActual('dashboard');
+  };
+
   if (!user) {
     return (
       vistaActual === 'login' 
@@ -31,7 +44,8 @@ function App() {
         : <RegisterPage onGoToLogin={() => setVistaActual('login')} />
     );
   }
-  // inicio Redirigir según el rol 26/04/2026
+
+  // Redirigir según el rol
   if (user.id_rol === 3 || user.rol === 'nino') {
     return (
       <NinoDashboard 
@@ -43,13 +57,28 @@ function App() {
       />
     );
   }
-  // fin Redirigir según el rol 26/04/2026
 
+  // Vista de progreso
+  if (vistaActual === 'progreso' && ninoProgreso) {
+    return (
+      <ProgresoPage 
+        idNino={ninoProgreso.id_nino} 
+        nombreNino={ninoProgreso.nombre}
+        onBack={volverAlDashboard}
+      />
+    );
+  }
+
+  // Vista del dashboard del tutor
   return (
-    <TutorDashboard usuario={user} onLogout={() => {
-      localStorage.removeItem('user');
-      setUser(null);
-    }} />
+    <TutorDashboard 
+      usuario={user} 
+      onLogout={() => {
+        localStorage.removeItem('user');
+        setUser(null);
+      }} 
+      onVerProgreso={verProgreso}
+    />
   );
 }
 
