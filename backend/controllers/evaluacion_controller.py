@@ -28,8 +28,8 @@ motor = MotorInferencia()
 explicacion_service = ExplicacionService()
 
 # Usar variable de entorno para ffmpeg
-FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
-#FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe")
+#FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe")
 
 class EvaluacionManual(BaseModel):
     id_nino: int
@@ -223,7 +223,6 @@ async def evaluar_fonema(
             raise HTTPException(status_code=400, detail="Parámetros inválidos")
 
         nombre_fonema = mapear_id_a_nombre(fonema_objetivo)
-        # Remover validación estricta del mapeo para permitir fonemas no mapeados
 
         # Crear directorio temporal si no existe
         temp_dir = "data/temp_audios"
@@ -247,7 +246,7 @@ async def evaluar_fonema(
                 ], check=True, capture_output=True)
                 audio_path = wav_path
                 os.remove(temp_audio_path)
-                temp_audio_path = audio_path  # Actualizar para limpieza
+                temp_audio_path = audio_path
             except subprocess.CalledProcessError as e:
                 logger.error(f"Error convirtiendo audio: {e}")
                 raise HTTPException(status_code=500, detail="Error procesando el audio")
@@ -263,29 +262,52 @@ async def evaluar_fonema(
             edad=edad
         )
 
-        # Actualizar rendimiento y memoria de trabajo
+        # =========================================================
+        # CORRECCIÓN: Convertir fonema_objetivo a ID numérico
+        # =========================================================
         confiabilidad = obtener_confiabilidad_por_edad(id_nino)
-        actualizar_rendimiento(id_nino, int(fonema_objetivo), porcentaje_similitud)
-        insertar_en_memoria_trabajo(id_evaluacion, fonema_objetivo, porcentaje_similitud, "MFCC", confiabilidad)
+        
+        # Mapeo de nombres de fonemas a IDs
+        mapeo_fonemas = {
+            'r': 1, 'rr': 2, 'ere': 2, 's': 3, 'l': 4, 'c': 5,
+            't': 6, 'd': 7, 'p': 8, 'b': 9, 'g': 10, 'f': 14, 'ch': 16
+        }
+        
+        # Intentar convertir a entero primero
+        try:
+            id_hecho_num = int(fonema_objetivo)
+        except ValueError:
+            # Si no es número, usar el mapeo
+            id_hecho_num = mapeo_fonemas.get(fonema_objetivo.lower(), 0)
+            logger.info(f"Mapeando fonema '{fonema_objetivo}' a ID {id_hecho_num}")
+        
+        # Actualizar rendimiento (usa el ID numérico)
+        if id_hecho_num > 0:
+            actualizar_rendimiento(id_nino, id_hecho_num, porcentaje_similitud)
+        else:
+            logger.warning(f"No se pudo mapear fonema_objetivo: {fonema_objetivo} a ID de hecho")
+        
+        # Insertar en memoria de trabajo (¡USA EL ID NUMÉRICO, no el string!)
+        # Convertir a string para el parámetro, pero el ID numérico es el correcto
+        insertar_en_memoria_trabajo(id_evaluacion, str(id_hecho_num), porcentaje_similitud, "MFCC", confiabilidad)
 
         return {
             "status": "success",
             "similitud_detectada": round(porcentaje_similitud, 4),
-            "id_hecho": fonema_objetivo,
+            "id_hecho": id_hecho_num,
             "fonema_evaluado": nombre_fonema
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error en evaluar_fonema: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     finally:
         if temp_audio_path and os.path.exists(temp_audio_path):
             try:
                 os.remove(temp_audio_path)
             except OSError:
                 pass
-
 # CORRECCIÓN: ahora el endpoint de evaluación manual también actualiza el rendimiento histórico y obtiene id_tipo_evidencia dinámicamente para mantener consistencia con el endpoint de evaluación automática 23/04/26
 @router.post("/evaluar-manual")
 async def evaluar_manual(datos: EvaluacionManual):
@@ -1319,3 +1341,19 @@ async def obtener_historial_evaluaciones(id_nino: int):
         logger.error(f"Error obteniendo historial para niño {id_nino}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 # fin nuevo endpoint para obtener historial de evaluaciones y rendimiento histórico 26/04/2026
+
+
+def obtener_rendimiento_hecho(id_nino: int, id_hecho: int) -> float:
+    """Obtiene el rendimiento histórico de un hecho específico."""
+    try:
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT promedio FROM rendimiento_hecho
+                WHERE id_nino = %s AND id_hecho = %s
+            """, (id_nino, id_hecho))
+            row = cursor.fetchone()
+            return float(row['promedio']) if row else 0.0
+    except Exception as e:
+        logger.error(f"Error obteniendo rendimiento: {e}")
+        return 0.0
