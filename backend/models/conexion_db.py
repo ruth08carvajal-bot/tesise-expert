@@ -2,11 +2,9 @@ import os
 import mysql.connector
 from mysql.connector import Error
 from contextlib import contextmanager
-import logging
+from utils.logger import get_logger
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class Database:
     def __init__(self):

@@ -1,28 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from models.conexion_db import db_admin
-from pydantic import BaseModel
+from schemas import NinoSchema
 from datetime import date, datetime
-import logging
+from utils.logger import get_logger
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-router = APIRouter()
-
-def calcular_edad(fecha_nacimiento):
-    if isinstance(fecha_nacimiento, str):
-        fecha_nacimiento = datetime.strptime(fecha_nacimiento, '%Y-%m-%d').date()
-    today = date.today()
-    return today.year - fecha_nacimiento.year - ((today.month, today.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
-
-class NinoSchema(BaseModel):
-    id_tut: int
-    nombre: str
-    f_nac: date
-    genero: str
-    escolaridad: str
-    parentesco: str
+logger = get_logger(__name__)
 
 @router.post("/registrar-nino")
 async def registrar_nino(nino: NinoSchema):

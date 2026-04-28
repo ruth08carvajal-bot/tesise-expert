@@ -3,12 +3,10 @@ import numpy as np
 import librosa
 import soundfile as sf # Motor portátil para WAV
 import traceback
-import logging
+from utils.logger import get_logger
 from models.conexion_db import db_admin
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class MFCCService:
     def __init__(self):

@@ -1,33 +1,32 @@
 // api/evaluacionService.js
 import axios from 'axios';
-
-const API_URL = 'http://127.0.0.1:8003/evaluacion';
+import { API_ENDPOINTS } from '../config';
 
 // =========================================================
 // EVALUACIÓN PRINCIPAL
 // =========================================================
 
 export const obtenerPlan = async (id_nino) => {
-    const response = await axios.get(`${API_URL}/plan-evaluacion/${id_nino}`);
+    const response = await axios.get(`${API_ENDPOINTS.evaluacion}/plan-evaluacion/${id_nino}`);
     return response.data;
 };
 
 export const enviarAudioEvaluacion = async (formData) => {
-    const response = await axios.post(`${API_URL}/evaluar-fonema`, formData, {
+    const response = await axios.post(`${API_ENDPOINTS.evaluacion}/evaluar-fonema`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
 };
 
 export const enviarValorFuzzy = async (datos) => {
-    const response = await axios.post(`${API_URL}/evaluar-manual`, datos);
+    const response = await axios.post(`${API_ENDPOINTS.evaluacion}/evaluar-manual`, datos);
     return response.data;
 };
 
 export const iniciarEvaluacion = async (id_nino) => {
     const formData = new FormData();
     formData.append('id_nino', id_nino);
-    const response = await axios.post(`${API_URL}/iniciar-evaluacion`, formData, {
+    const response = await axios.post(`${API_ENDPOINTS.evaluacion}/iniciar-evaluacion`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
@@ -39,7 +38,7 @@ export const obtenerResultadosDiagnostico = async (id_nino, id_evaluacion) => {
 };
 
 export const finalizarEvaluacion = async (id_nino, id_evaluacion) => {
-    const response = await axios.post(`${API_URL}/finalizar-evaluacion`, {
+    const response = await axios.post(`${API_ENDPOINTS.evaluacion}/finalizar-evaluacion`, {
         id_nino: id_nino,
         id_evaluacion: id_evaluacion
     });

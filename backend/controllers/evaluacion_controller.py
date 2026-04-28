@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from schemas import EvaluacionManual
 from services.mfcc_service import MFCCService
 from services.motor_inferencia import MotorInferencia
 from services.explicacion_service import ExplicacionService
@@ -11,7 +11,7 @@ from controllers.ninos_controller import calcular_edad
 import shutil
 import os
 import subprocess
-import logging
+from utils.logger import get_logger
 import tempfile
 import numpy as np
 import librosa
@@ -20,24 +20,16 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from datetime import datetime, date
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 mfcc_service = MFCCService()
 motor = MotorInferencia()
 explicacion_service = ExplicacionService()
 
-FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
-#FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe")
-
-
-class EvaluacionManual(BaseModel):
-    id_nino: int
-    id_evaluacion: int
-    id_hecho: int
-    valor: float
+FFMPEG_PATH = os.getenv("FFMPEG_PATH") or shutil.which("ffmpeg")
+if not FFMPEG_PATH:
+    raise RuntimeError("FFmpeg not found. Please install FFmpeg or set FFMPEG_PATH environment variable.")
 
 
 class FinalizarEvaluacionRequest(BaseModel):

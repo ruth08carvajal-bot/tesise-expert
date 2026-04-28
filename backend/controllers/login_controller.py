@@ -1,17 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from models.conexion_db import db_admin
-from pydantic import BaseModel
-import logging
+from schemas import LoginSchema
+from utils.logger import get_logger
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-router = APIRouter()
-
-class LoginSchema(BaseModel):
-    username: str
-    password: str
+logger = get_logger(__name__)
 
 class RegisterSchema(BaseModel):
     nombre_completo: str

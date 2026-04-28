@@ -1,13 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from models.conexion_db import db_admin
 from datetime import date, datetime
-import logging
+from utils.logger import get_logger
 # Importamos la función desde tu controlador de niños
 from controllers.ninos_controller import calcular_edad
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 

@@ -3,13 +3,12 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict
 from models.conexion_db import db_admin
 from services.motor_inferencia import MotorInferencia
-import logging
+from utils.logger import get_logger
 import re
 from datetime import datetime
 import unicodedata
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 motor = MotorInferencia()

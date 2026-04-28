@@ -3,10 +3,9 @@ from dataclasses import dataclass, field
 from models.conexion_db import db_admin
 from models.entidades import BaseReglas
 from services.certeza_service import CertezaService
-import logging
+from utils.logger import get_logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

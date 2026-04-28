@@ -1,21 +1,13 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from schemas import GuardarProgresoSchema
 from models.conexion_db import db_admin
 from controllers.ninos_controller import calcular_edad
-import logging
+from utils.logger import get_logger
 from datetime import datetime
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
-
-
-class GuardarProgresoSchema(BaseModel):
-    id_nino: int
-    id_ejercicio: int
-    puntaje_obtenido: float
-    tiempo_empleado: int  # en segundos
 
 
 @router.get("/mis-ejercicios/{id_nino}")
