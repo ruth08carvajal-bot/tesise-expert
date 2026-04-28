@@ -5,14 +5,7 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-class RegisterSchema(BaseModel):
-    nombre_completo: str
-    username: str
-    password: str
-    email: str
-    celular: str
-    ocupacion: str
-    zona: str
+router = APIRouter()
 
 #@router.post("/login")
 #async def login(datos: LoginSchema):
@@ -130,33 +123,3 @@ async def login(datos: LoginSchema):
                 }
             }
 # fin nuevo login con roles y datos completos 26/04/2026
-@router.post("/register")
-async def register(datos: RegisterSchema):
-    try:
-        with db_admin.obtener_conexion() as conn:
-            cursor = conn.cursor()
-            
-            # 1. Insertar en tabla 'usuario'
-            query_user = "INSERT INTO usuario (usr, psw, id_rol) VALUES (%s, %s, 2)"
-            cursor.execute(query_user, (datos.username, datos.password))
-            id_nuevo_usuario = cursor.lastrowid
-
-            # 2. Insertar en tabla 'tutor' con todos los datos de la ficha
-            query_tutor = """
-                INSERT INTO tutor (id_user, nombre, email, celular, ocupacion, zona) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(query_tutor, (
-                id_nuevo_usuario, 
-                datos.nombre_completo, 
-                datos.email, 
-                datos.celular, 
-                datos.ocupacion, 
-                datos.zona
-            ))
-            
-            conn.commit()
-            return {"status": "success", "username_generado": datos.username}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Error interno del servidor")

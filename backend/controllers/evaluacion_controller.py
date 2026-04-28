@@ -19,6 +19,7 @@ from typing import List, Dict
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from datetime import datetime, date
+from pydantic import BaseModel
 
 logger = get_logger(__name__)
 

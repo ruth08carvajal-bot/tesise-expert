@@ -6,6 +6,14 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+def calcular_edad(fecha_nacimiento):
+    if isinstance(fecha_nacimiento, str):
+        fecha_nacimiento = datetime.strptime(fecha_nacimiento, '%Y-%m-%d').date()
+    today = date.today()
+    return today.year - fecha_nacimiento.year - ((today.month, today.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
+
+router = APIRouter()
+
 @router.post("/registrar-nino")
 async def registrar_nino(nino: NinoSchema):
     try:

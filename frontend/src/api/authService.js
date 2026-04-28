@@ -15,7 +15,7 @@ export const login = async (username, password) => {
 // registrar nuevo usuario (tutor)
 export const register = async (formData) => {
     try {
-        const response = await axios.post(`${API_URL}/register`, {
+        const response = await axios.post(`${API_ENDPOINTS.auth}/register`, {
             nombre_completo: formData.nombre_completo,
             username: formData.username,
             password: formData.password,
