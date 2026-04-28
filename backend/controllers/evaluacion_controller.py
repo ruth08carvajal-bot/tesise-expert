@@ -28,8 +28,8 @@ motor = MotorInferencia()
 explicacion_service = ExplicacionService()
 
 # Usar variable de entorno para ffmpeg
-#FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
-FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe")
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\ffmpeg\bin\ffmpeg.exe")
+#FFMPEG_PATH = os.getenv("FFMPEG_PATH", r"C:\Program Files\GNU Octave\Octave-8.3.0\mingw64\bin\ffmpeg.exe")
 
 class EvaluacionManual(BaseModel):
     id_nino: int
@@ -711,27 +711,31 @@ def obtener_informe_clinico(id_nino: int, id_evaluacion: int):
         'faq': explicacion_service.preguntas_frecuentes()
     }
 
-#inicio nuevo endpoint para generar PDF clínico completo 26/04/2026
+#inicio nuevo endpoint para generar PDF clínico completo 27/04/2026 - VERSIÓN CORREGIDA
 def generar_pdf_clinico(id_nino: int, id_evaluacion: int) -> str:
-    """Genera un PDF profesional con el informe clínico completo."""
+    """Genera un PDF profesional con el informe clínico completo - Versión con tablas y pie de página correcto."""
     
-    # Obtener datos actualizados de la BD (incluye lo que guardamos en Paso 1)
+    # Obtener datos actualizados de la BD
     with db_admin.obtener_conexion() as conn:
         cursor = conn.cursor(dictionary=True)
         
-        # Obtener datos del niño
+        # Obtener datos del niño (SOLO columnas que existen)
         cursor.execute("""
-            SELECT n.nombre, n.f_nac, n.genero, n.escolaridad, t.nombre as tutor_nombre
+            SELECT n.nombre, n.f_nac, n.genero, n.escolaridad, n.parentesco,
+                   t.nombre as tutor_nombre, t.celular as tutor_celular, t.email as tutor_email, t.zona as tutor_zona
             FROM nino n
             JOIN tutor t ON n.id_tut = t.id_tut
             WHERE n.id_nino = %s
         """, (id_nino,))
         nino = cursor.fetchone()
         
-        # Obtener datos de la evaluación (ya actualizados)
+        if nino is None:
+            raise ValueError(f"No se encontró el niño con id {id_nino}")
+        
+        # Obtener datos de la evaluación
         cursor.execute("""
             SELECT diagnostico_sistema, pronostico_sistema, sugerencia_ejercicios, 
-                   explicacion_logica, fecha_eval, tipo_evaluacion
+                   explicacion_logica, fecha_eval, tipo_evaluacion, notas_tutor
             FROM evaluacion_sesion
             WHERE id_ev = %s
         """, (id_evaluacion,))
@@ -747,221 +751,479 @@ def generar_pdf_clinico(id_nino: int, id_evaluacion: int) -> str:
         """, (id_evaluacion,))
         mfcc_scores = cursor.fetchall()
         
-        # Obtener anamnesis relevante
+        # Obtener anamnesis (con descripciones más limpias)
         cursor.execute("""
             SELECT bh.descripcion
             FROM anamnesis_hechos ah
             JOIN base_hechos bh ON ah.id_hecho = bh.id_hecho
             WHERE ah.id_nino = %s
-            LIMIT 10
+            ORDER BY ah.id_ana_h ASC
+            LIMIT 8
         """, (id_nino,))
         anamnesis = cursor.fetchall()
     
-    # Calcular edad
-    edad_nino = calcular_edad(nino['f_nac'])
+    # Calcular edad exacta
+    edad_nino = calcular_edad_exacta(nino['f_nac'])
+    fecha_actual = datetime.now()
     
-    # Crear PDF
+    # Crear directorio temporal
     temp_dir = tempfile.mkdtemp()
-    pdf_path = os.path.join(temp_dir, f"reporte_clinico_{id_nino}_{id_evaluacion}.pdf")
-    c = canvas.Canvas(pdf_path, pagesize=letter)
+    pdf_path = os.path.join(temp_dir, f"informe_clinico_{id_nino}_{id_evaluacion}.pdf")
+    
+    # Configurar el canvas
+    c = canvas.Canvas(pdf_path, pagesize=letter, encoding='utf-8')
     width, height = letter
-    y = height - 60
+    y = height - 50
     
     # =========================================================
-    # ENCABEZADO
+    # ENCABEZADO PROFESIONAL
     # =========================================================
-    c.setFont("Helvetica-Bold", 18)
-    c.setFillColorRGB(0.2, 0.3, 0.5)  # Color azul institucional
+    # Barra superior decorativa
+    c.setFillColorRGB(0.0, 0.4, 0.6)
+    c.rect(0, height-40, width, 40, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(50, height-28, "SISTEMA EXPERTO DE FONOAUDIOLOGÍA CLÍNICA - BOLIVIA")
+    c.setFont("Helvetica", 8)
+    c.drawString(50, height-16, "Unidad de Evaluación y Diagnóstico del Lenguaje")
+    
+    # Línea decorativa
+    y = height - 55
+    c.setStrokeColorRGB(0.0, 0.4, 0.6)
+    c.setLineWidth(2)
+    c.line(45, y, width-45, y)
+    y -= 18
+    
+    # Título principal
+    c.setFillColorRGB(0.1, 0.2, 0.3)
+    c.setFont("Helvetica-Bold", 16)
     c.drawString(50, y, "INFORME DE EVALUACIÓN FONOAUDIOLÓGICA")
-    y -= 25
+    y -= 22
     
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawString(50, y, f"Fecha de emisión: {datetime.now().strftime('%d/%m/%Y')}")
-    y -= 20
-    
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "DATOS DEL PACIENTE")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, f"Nombre: {nino['nombre']}")
-    y -= 14
-    c.drawString(50, y, f"Edad: {edad_nino} años")
-    y -= 14
-    c.drawString(50, y, f"Género: {nino['genero']}")
-    y -= 14
-    c.drawString(50, y, f"Escolaridad: {nino['escolaridad']}")
-    y -= 14
-    c.drawString(50, y, f"Tutor: {nino['tutor_nombre']}")
-    y -= 20
-    
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "DATOS DE LA EVALUACIÓN")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, f"Fecha de evaluación: {evaluacion['fecha_eval'].strftime('%d/%m/%Y')}")
-    y -= 14
-    
-    tipo_texto = "Evaluación Inicial" if evaluacion['tipo_evaluacion'] == 'Inicial' else "Evaluación de Control / Reevaluación"
-    c.drawString(50, y, f"Tipo: {tipo_texto}")
-    y -= 20
+    c.setFont("Helvetica", 9)
+    c.setFillColorRGB(0.4, 0.4, 0.4)
+    c.drawString(50, y, f"Fecha de emisión: {fecha_actual.strftime('%d/%m/%Y')} - {fecha_actual.strftime('%H:%M')} hrs")
+    y -= 30
     
     # =========================================================
-    # DIAGNÓSTICO (desde la BD)
+    # SECCIÓN 1: DATOS DEL PACIENTE
     # =========================================================
-    c.setFont("Helvetica-Bold", 12)
-    c.setFillColorRGB(0.8, 0.2, 0.2)
-    c.drawString(50, y, "DIAGNÓSTICO CLÍNICO")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0, 0, 0)
+    datos_paciente = [
+        ("Nombre completo:", nino['nombre']),
+        ("Fecha de nacimiento:", nino['f_nac'].strftime('%d/%m/%Y')),
+        ("Edad:", edad_nino),
+        ("Género:", "Masculino" if nino['genero'] == 'M' else "Femenino"),
+        ("Escolaridad:", nino['escolaridad'] or 'No registrada'),
+        ("Parentesco con tutor:", nino['parentesco'] or 'No registrado'),
+        ("Tutor/a responsable:", nino['tutor_nombre'].title() if nino['tutor_nombre'] else 'No registrado'),
+        ("Teléfono de contacto:", nino['tutor_celular'] or 'No registrado'),
+        ("Zona de residencia:", nino['tutor_zona'] or 'No registrada')
+    ]
     
-    diagnostico_texto = evaluacion.get('diagnostico_sistema', 'No disponible')
-    for line in _formatear_parrafo_pdf(diagnostico_texto, 80):
-        c.drawString(60, y, line)
-        y -= 12
-        if y < 80:
-            c.showPage()
-            y = height - 60
-            c.setFont("Helvetica", 10)
+    y = dibujar_seccion_con_tabla(c, y, "1. DATOS DEL PACIENTE", datos_paciente)
     y -= 10
     
     # =========================================================
-    # PRONÓSTICO (desde la BD)
+    # SECCIÓN 2: DATOS DE LA EVALUACIÓN
     # =========================================================
-    if y < 120:
+    if y < 200:
         c.showPage()
-        y = height - 60
+        y = height - 50
+        dibujar_encabezado_pagina(c, height)
     
-    c.setFont("Helvetica-Bold", 12)
-    c.setFillColorRGB(0.2, 0.6, 0.2)
-    c.drawString(50, y, "PRONÓSTICO")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0, 0, 0)
-    
-    pronostico_texto = evaluacion.get('pronostico_sistema', 'No disponible')
-    for line in _formatear_parrafo_pdf(pronostico_texto, 80):
-        c.drawString(60, y, line)
-        y -= 12
-        if y < 80:
-            c.showPage()
-            y = height - 60
-            c.setFont("Helvetica", 10)
-    y -= 15
-    
-    # =========================================================
-    # PLAN DE INTERVENCIÓN (desde la BD)
-    # =========================================================
-    if y < 150:
-        c.showPage()
-        y = height - 60
-    
-    c.setFont("Helvetica-Bold", 12)
-    c.setFillColorRGB(0.2, 0.3, 0.5)
-    c.drawString(50, y, "PLAN DE INTERVENCIÓN / EJERCICIOS RECOMENDADOS")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0, 0, 0)
-    
-    ejercicios_texto = evaluacion.get('sugerencia_ejercicios', 'No disponible')
-    for line in _formatear_parrafo_pdf(ejercicios_texto, 80):
-        c.drawString(60, y, line)
-        y -= 12
-        if y < 80:
-            c.showPage()
-            y = height - 60
-            c.setFont("Helvetica", 10)
-    y -= 15
-    
-    # =========================================================
-    # PUNTAJES MFCC (Rendimiento por fonema)
-    # =========================================================
-    if y < 150:
-        c.showPage()
-        y = height - 60
-    
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "RENDIMIENTO POR FONEMA (Análisis Acústico MFCC)")
-    y -= 18
-    c.setFont("Helvetica", 9)
-    
-    # Cabecera de la tabla
-    c.drawString(50, y, "Fonema")
-    c.drawString(180, y, "Puntaje")
-    c.drawString(280, y, "Interpretación")
-    y -= 12
-    
-    for score in mfcc_scores[:15]:
-        valor = score['valor_obtenido']
-        descripcion = score['descripcion'][:30] if score['descripcion'] else "Fonema"
-        
-        if valor >= 0.7:
-            interpretacion = "✅ Correcto"
-        elif valor >= 0.4:
-            interpretacion = "⚠️ En desarrollo"
-        else:
-            interpretacion = "🔴 Requiere refuerzo"
-        
-        c.drawString(50, y, descripcion)
-        c.drawString(180, y, f"{valor*100:.1f}%")
-        c.drawString(280, y, interpretacion)
-        y -= 12
-        
-        if y < 80:
-            c.showPage()
-            y = height - 60
-            c.setFont("Helvetica", 9)
-            c.drawString(50, y, "Fonema")
-            c.drawString(180, y, "Puntaje")
-            c.drawString(280, y, "Interpretación")
-            y -= 12
-    
-    y -= 15
-    
-    # =========================================================
-    # RECOMENDACIONES PARA EL TUTOR
-    # =========================================================
-    if y < 150:
-        c.showPage()
-        y = height - 60
-    
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "RECOMENDACIONES PARA EL TUTOR")
-    y -= 18
-    c.setFont("Helvetica", 10)
-    
-    recomendaciones = [
-        "1. Realizar los ejercicios recomendados en casa con una frecuencia de 3-4 veces por semana.",
-        "2. Mantener un ambiente tranquilo y sin distracciones durante las sesiones de práctica.",
-        "3. Celebrar los logros del niño, incluso los pequeños avances.",
-        "4. Consultar con un especialista si persisten las dificultades después de 3 meses de práctica.",
-        "5. Utilizar el chatbot 'Asistente Clínico' para resolver dudas sobre los resultados."
+    datos_evaluacion = [
+        ("Fecha de evaluación:", evaluacion['fecha_eval'].strftime('%d/%m/%Y')),
+        ("Tipo de evaluación:", "Evaluación Inicial" if evaluacion['tipo_evaluacion'] == 'Inicial' else "Evaluación de Control"),
+        ("Método de evaluación:", "Evaluación Acústica Automatizada (MFCC) + Anamnesis Clínica")
     ]
     
-    for rec in recomendaciones:
-        for line in _formatear_parrafo_pdf(rec, 85):
-            c.drawString(60, y, line)
-            y -= 12
-            if y < 80:
-                c.showPage()
-                y = height - 60
-                c.setFont("Helvetica", 10)
-        y -= 4
+    if evaluacion.get('notas_tutor'):
+        datos_evaluacion.append(("Notas del tutor:", evaluacion['notas_tutor'][:60]))
+    
+    y = dibujar_seccion_con_tabla(c, y, "2. DATOS DE LA EVALUACIÓN", datos_evaluacion)
+    y -= 10
     
     # =========================================================
-    # PIE DE PÁGINA
+    # SECCIÓN 3: ANTECEDENTES (ANAMNESIS)
     # =========================================================
-    c.showPage()
-    c.setFont("Helvetica-Oblique", 8)
-    c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawString(50, 50, "Documento generado automáticamente por el Sistema Experto Fonoaudiológico")
-    c.drawString(50, 40, "Este informe no sustituye la consulta con un especialista.")
-    c.drawString(50, 30, f"Reporte ID: {id_evaluacion} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    if y < 180:
+        c.showPage()
+        y = height - 50
+        dibujar_encabezado_pagina(c, height)
+    
+    # Limpiar descripciones de anamnesis
+    items_anamnesis = []
+    for h in anamnesis[:6]:
+        desc = h['descripcion']
+        # Limpiar texto: eliminar "Test:" o prefijos similares
+        desc = desc.replace('Test:', '').replace('Anamnesis:', '').strip()
+        if len(desc) > 80:
+            desc = desc[:77] + "..."
+        items_anamnesis.append(desc)
+    
+    y = dibujar_seccion_con_lista(c, y, "3. ANTECEDENTES CLÍNICOS (ANAMNESIS)", items_anamnesis)
+    y -= 10
+    
+    # =========================================================
+    # SECCIÓN 4: DIAGNÓSTICO CLÍNICO
+    # =========================================================
+    if y < 150:
+        c.showPage()
+        y = height - 50
+        dibujar_encabezado_pagina(c, height)
+    
+    diagnostico = evaluacion.get('diagnostico_sistema', 'No disponible')
+    y = dibujar_seccion_texto(c, y, "4. DIAGNÓSTICO CLÍNICO", diagnostico, color_fondo=(0.7, 0.2, 0.2), altura_extra=15)
+    y -= 10
+    
+    # =========================================================
+    # SECCIÓN 5: PRONÓSTICO
+    # =========================================================
+    if y < 150:
+        c.showPage()
+        y = height - 50
+        dibujar_encabezado_pagina(c, height)
+    
+    pronostico = evaluacion.get('pronostico_sistema', 'No disponible')
+    y = dibujar_seccion_texto(c, y, "5. PRONÓSTICO", pronostico, color_fondo=(0.2, 0.5, 0.2), altura_extra=15)
+    y -= 10
+    
+    # =========================================================
+    # SECCIÓN 6: PLAN DE INTERVENCIÓN
+    # =========================================================
+    if y < 150:
+        c.showPage()
+        y = height - 50
+        dibujar_encabezado_pagina(c, height)
+    
+    ejercicios = evaluacion.get('sugerencia_ejercicios', 'No disponible')
+    y = dibujar_seccion_texto(c, y, "6. PLAN DE INTERVENCIÓN", ejercicios, color_fondo=(0.2, 0.4, 0.6), altura_extra=15)
+    y -= 15
+    
+    # =========================================================
+    # SECCIÓN 7: TABLA DE RENDIMIENTO MFCC
+    # =========================================================
+    if y < 200:
+        c.showPage()
+        y = height - 70
+        dibujar_encabezado_pagina(c, height)
+    
+    y = dibujar_tabla_mfcc_profesional(c, y, mfcc_scores)
+    y -= 15
+    
+    # =========================================================
+    # SECCIÓN 8: RECOMENDACIONES
+    # =========================================================
+    if y < 150:
+        c.showPage()
+        y = height - 50
+        dibujar_encabezado_pagina(c, height)
+    
+    recomendaciones = [
+        "Realizar los ejercicios recomendados en casa 3-4 veces por semana, en sesiones de 15-20 minutos.",
+        "Mantener un ambiente tranquilo, sin televisión ni ruidos de fondo durante las prácticas.",
+        "Reforzar positivamente cada logro del niño, por pequeño que sea.",
+        "Consultar nuevamente si no se observan avances después de 8 semanas de práctica constante.",
+        "Utilizar el chatbot 'AsistenteClínico' para resolver dudas sobre los ejercicios."
+    ]
+    
+    y = dibujar_seccion_con_lista(c, y, "8. RECOMENDACIONES PARA EL TUTOR", recomendaciones, con_vistas=False)
+    
+    # =========================================================
+    # PIE DE PÁGINA EN LA MISMA PÁGINA
+    # =========================================================
+    dibujar_pie_pagina_profesional(c, width, height, id_evaluacion, fecha_actual)
     
     c.save()
     return pdf_path
+
+
+def dibujar_encabezado_pagina(c, height):
+    """Dibuja el encabezado en páginas nuevas."""
+    c.setFillColorRGB(0.0, 0.4, 0.6)
+    c.rect(0, height-40, 612, 40, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, height-28, "SISTEMA EXPERTO DE FONOAUDIOLOGÍA CLÍNICA - BOLIVIA")
+    c.setFont("Helvetica", 7)
+    c.drawString(50, height-16, "Informe de Evaluación Fonoaudiológica")
+    
+    c.setStrokeColorRGB(0.0, 0.4, 0.6)
+    c.setLineWidth(1.5)
+    c.line(45, height-45, 567, height-45)
+
+
+def dibujar_seccion_con_tabla(c, y, titulo, datos):
+    """Dibuja una sección con tabla de 2 columnas con bordes."""
+    # Fondo del título
+    c.setFillColorRGB(0.2, 0.3, 0.5)
+    c.rect(45, y-3, 520, 20, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(55, y+2, titulo)
+    y -= 18
+    
+    # Dibujar tabla
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 9)
+    
+    fila_y = y
+    for i, (label, value) in enumerate(datos):
+        if fila_y < 50:
+            break
+            
+        # Borde de celda
+        c.setStrokeColorRGB(0.7, 0.7, 0.7)
+        c.setLineWidth(0.5)
+        c.rect(45, fila_y-12, 250, 14, fill=0)
+        c.rect(295, fila_y-12, 270, 14, fill=0)
+        
+        # Contenido
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(50, fila_y-8, label)
+        c.setFont("Helvetica", 9)
+        valor_str = str(value)[:55] if len(str(value)) > 55 else str(value)
+        c.drawString(300, fila_y-8, valor_str)
+        
+        fila_y -= 15
+    
+    return fila_y - 5
+
+
+def dibujar_seccion_con_lista(c, y, titulo, items, con_vistas=True):
+    """Dibuja una sección con lista de items."""
+    # Fondo del título
+    c.setFillColorRGB(0.2, 0.5, 0.3)
+    c.rect(45, y-3, 520, 20, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(55, y+2, titulo)
+    y -= 18
+    
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 9)
+    
+    for idx, item in enumerate(items, 1):
+        if y < 50:
+            break
+        
+        # Número o viñeta
+        if con_vistas:
+            c.setFillColorRGB(0.8, 0.9, 1)
+            c.rect(48, y-2, 6, 6, fill=1)
+            c.setFillColorRGB(0, 0, 0)
+            prefijo = ""
+        else:
+            prefijo = f"{idx}. "
+            c.setFillColorRGB(0, 0, 0)
+        
+        for line in formatear_texto_pdf(prefijo + item, 85):
+            if y < 50:
+                break
+            if con_vistas:
+                c.drawString(60, y-4, line)
+            else:
+                c.drawString(55, y-4, line)
+            y -= 12
+        y -= 3
+    
+    return y
+
+
+def dibujar_seccion_texto(c, y, titulo, texto, color_fondo=None, altura_extra=0):
+    """Dibuja una sección con texto formateado."""
+    if color_fondo is None:
+        color_fondo = (0.2, 0.3, 0.5)
+    
+    c.setFillColorRGB(*color_fondo)
+    c.rect(45, y-3, 520, 20, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(55, y+2, titulo)
+    y -= 18
+    
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 9)
+    
+    # Limpiar texto
+    texto_limpio = texto.replace('**', '').replace('__', '')
+    
+    for line in formatear_texto_pdf(texto_limpio, 90):
+        if y < 50:
+            break
+        c.drawString(55, y, line)
+        y -= 12
+    
+    return y - altura_extra
+
+
+def dibujar_tabla_mfcc_profesional(c, y, scores):
+    """Dibuja tabla profesional de rendimiento MFCC con bordes."""
+    # Título de la sección
+    c.setFillColorRGB(0.3, 0.3, 0.5)
+    c.rect(45, y-3, 520, 20, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(55, y+2, "7. RENDIMIENTO POR FONEMA (Análisis Acústico MFCC)")
+    y -= 20
+    
+    # Encabezados de tabla
+    c.setFillColorRGB(0.2, 0.3, 0.5)
+    c.rect(45, y-2, 520, 16, fill=1)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(55, y, "FONEMA")
+    c.drawString(220, y, "PUNTAJE")
+    c.drawString(320, y, "INTERPRETACIÓN CLÍNICA")
+    c.drawString(490, y, "NIVEL")
+    y -= 18
+    
+    # Filas de datos
+    c.setFont("Helvetica", 9)
+    fila_y = y
+    row_count = 0
+    
+    # Si no hay scores, mostrar mensaje
+    if not scores:
+        c.setFillColorRGB(0.95, 0.95, 0.95)
+        c.rect(45, fila_y-2, 520, 20, fill=1)
+        c.setFillColorRGB(0.5, 0.5, 0.5)
+        c.setFont("Helvetica-Oblique", 9)
+        c.drawString(55, fila_y, "No hay datos de evaluación MFCC disponibles")
+        c.setFont("Helvetica", 9)
+        return fila_y - 20
+    
+    for score in scores[:10]:
+        valor = score['valor_obtenido'] if score['valor_obtenido'] is not None else 0
+        # Limpiar nombre del fonema
+        fonema = score['descripcion'] if score['descripcion'] else "Fonema"
+        fonema = fonema.replace('Precisión en ', '').replace('/l/', 'L').replace('/r/', 'R').replace('/s/', 'S').strip()
+        if len(fonema) > 22:
+            fonema = fonema[:20] + "..."
+        
+        
+        # Bordes de celda
+       
+        c.setLineWidth(0.3)
+        c.rect(45, fila_y-2, 170, 14, fill=0)
+        c.rect(215, fila_y-2, 100, 14, fill=0)
+        c.rect(315, fila_y-2, 170, 14, fill=0)
+        c.rect(485, fila_y-2, 80, 14, fill=0)
+        
+        # Contenido
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(55, fila_y-1, fonema)
+        c.drawString(220, fila_y-1, f"{valor*100:.1f}%")
+        
+        # Interpretación con color
+        if valor >= 0.7:
+            interp = "Adecuado"
+            nivel = "Alto"
+            c.setFillColorRGB(0, 0.6, 0)
+        elif valor >= 0.5:
+            interp = "En proceso"
+            nivel = "Medio"
+            c.setFillColorRGB(0.8, 0.6, 0)
+        elif valor >= 0.3:
+            interp = "Requiere apoyo"
+            nivel = "Bajo"
+            c.setFillColorRGB(0.9, 0.5, 0)
+        else:
+            interp = "Déficit significativo"
+            nivel = "Crítico"
+            c.setFillColorRGB(0.8, 0.2, 0)
+        
+        c.drawString(330, fila_y-1, interp)
+        c.drawString(500, fila_y-1, nivel)
+        
+        fila_y -= 15
+        row_count += 1
+        
+        if fila_y < 60:
+            fila_y -= 10
+            c.setFont("Helvetica-Oblique", 7)
+            c.setFillColorRGB(0.4, 0.4, 0.4)
+            c.drawString(55, fila_y, "Nota: Puntajes basados en análisis acústico MFCC. ≥70% = adecuado para edad")
+            return fila_y - 15
+    
+    # Nota al pie
+    if fila_y > 50:
+        fila_y -= 8
+        c.setFont("Helvetica-Oblique", 7)
+        c.setFillColorRGB(0.4, 0.4, 0.4)
+        c.drawString(55, fila_y, "Nota: Puntajes basados en análisis acústico MFCC. ≥70% = adecuado para edad")
+    
+    return fila_y - 15
+
+
+def dibujar_pie_pagina_profesional(c, width, height, id_evaluacion, fecha_actual):
+    """Dibuja el pie de página en la misma página."""
+    # Línea separadora
+    c.setStrokeColorRGB(0.0, 0.4, 0.6)
+    c.setLineWidth(1)
+    c.line(45, 55, width-45, 55)
+    
+    # Texto del pie
+    c.setFont("Helvetica", 7)
+    c.setFillColorRGB(0.4, 0.4, 0.4)
+    c.drawString(50, 42, "Documento generado por el Sistema Experto Fonoaudiológico - Centro de Fonoaudiología Bolivia")
+    c.drawString(50, 32, "Este informe tiene carácter clínico y no sustituye la consulta presencial con un especialista.")
+    
+    # Código a la derecha
+    codigo_texto = f"Código: INF-{id_evaluacion:04d} | Generado: {fecha_actual.strftime('%d/%m/%Y %H:%M')}"
+    c.drawRightString(width-50, 42, codigo_texto)
+    
+    # Número de página
+    c.drawRightString(width-50, 32, f"Página {c.getPageNumber()}")
+
+
+def formatear_texto_pdf(texto: str, ancho_max: int = 90) -> list:
+    """Formatea un texto para que quepa en el ancho especificado."""
+    if not texto or texto == "No disponible":
+        return ["No disponible"]
+    
+    # Limpiar caracteres especiales
+    texto = texto.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    texto = texto.replace('**', '').replace('__', '').replace('✔', '')
+    
+    # Eliminar múltiples espacios
+    import re
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    
+    palabras = texto.split()
+    lineas = []
+    linea_actual = ""
+    
+    for palabra in palabras:
+        linea_prueba = linea_actual + " " + palabra if linea_actual else palabra
+        
+        if len(linea_prueba) <= ancho_max:
+            linea_actual = linea_prueba
+        else:
+            if linea_actual:
+                lineas.append(linea_actual)
+            linea_actual = palabra
+    
+    if linea_actual:
+        lineas.append(linea_actual)
+    
+    return lineas if lineas else [texto[:ancho_max]]
+
+
+def calcular_edad_exacta(fecha_nac: date) -> str:
+    """Calcula edad exacta en años y meses."""
+    hoy = datetime.now().date()
+    años = hoy.year - fecha_nac.year
+    meses = hoy.month - fecha_nac.month
+    
+    if meses < 0:
+        años -= 1
+        meses += 12
+    
+    if años > 0:
+        return f"{años} año{'s' if años != 1 else ''} y {meses} mes{'es' if meses != 1 else ''}"
+    else:
+        return f"{meses} mes{'es' if meses != 1 else ''}"
 
 
 def _formatear_parrafo_pdf(texto: str, ancho: int = 80) -> list:
