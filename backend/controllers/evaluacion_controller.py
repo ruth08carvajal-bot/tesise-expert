@@ -535,7 +535,7 @@ async def obtener_historial_evaluaciones(id_nino: int):
             
             cursor.execute("""
                 SELECT id_ev, fecha_eval, tipo_evaluacion, diagnostico_sistema,
-                       DATE_FORMAT(fecha_eval, '%%d/%%m/%%Y') as fecha_formateada
+                       DATE_FORMAT(fecha_eval, '%d/%m/%Y') as fecha_formateada
                 FROM evaluacion_sesion
                 WHERE id_nino = %s AND diagnostico_sistema IS NOT NULL
                 ORDER BY fecha_eval ASC

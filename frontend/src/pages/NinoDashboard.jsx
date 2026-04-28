@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PracticaEjercicio from '../components/Ejercicio/PracticaEjercicio';
+import { API_ENDPOINTS } from '../config';
 
-const API_URL = 'http://127.0.0.1:8003/ejercicios';
+const API_URL = `${API_ENDPOINTS.ejercicios}`;
 
-const NinoDashboard = ({ usuario, onLogout }) => {
+const NinoDashboard = ({ usuario, onLogout, onVerJuegos }) => {
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState(null);
     const [ejercicioSeleccionado, setEjercicioSeleccionado] = useState(null);
@@ -177,6 +178,7 @@ const NinoDashboard = ({ usuario, onLogout }) => {
     };
 
     const ejerciciosNivelActual = ejerciciosPorNivel[nombreNivel] || [];
+    const tieneJuegos = Object.values(ejerciciosPorNivel).some((nivel) => nivel.length > 0);
 
     if (cargando) {
         return (
@@ -269,7 +271,11 @@ const NinoDashboard = ({ usuario, onLogout }) => {
                         <span style={styles.starsIcon}>⭐</span>
                         <span style={styles.starsCount}>{estrellasTotales}</span>
                     </div>
-                    
+                    {tieneJuegos && (
+                        <button onClick={onVerJuegos} style={styles.juegosButton}>
+                            🎮 Juegos
+                        </button>
+                    )}
                     <button onClick={onLogout} style={styles.logoutButton}>
                         🚪 Salir
                     </button>
@@ -540,6 +546,21 @@ const styles = {
     },
     starsIcon: { fontSize: '20px' },
     starsCount: { fontSize: '18px', fontWeight: 'bold', color: '#f39c12' },
+    juegosButton: {
+        backgroundColor: '#2980b9',
+        color: 'white',
+        border: 'none',
+        padding: '10px 20px',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        transition: 'transform 0.2s ease, background-color 0.2s ease',
+        marginRight: '12px'
+    },
     logoutButton: { 
         backgroundColor: '#e74c3c', 
         color: 'white', 

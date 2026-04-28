@@ -6,27 +6,56 @@ import {
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
+import { API_ENDPOINTS } from '../config';
 
 ChartJS.register(
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend
 );
 
-const API_URL = 'http://127.0.0.1:8003/evaluacion';
-const NINO_API_URL = 'http://127.0.0.1:8003/ninos';
+const formatDateString = (dateString) => {
+    if (!dateString) return '';
+    if (typeof dateString !== 'string') return String(dateString);
+
+    const isoMatch = /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(dateString);
+    if (isoMatch) {
+        const date = new Date(dateString);
+        if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+    }
+
+    const dmyMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateString);
+    if (dmyMatch) {
+        return `${dmyMatch[1]}/${dmyMatch[2]}/${dmyMatch[3]}`;
+    }
+
+    return dateString;
+};
+
+const getFechaTexto = (evaluacion) => {
+    return evaluacion.fecha_formateada || formatDateString(evaluacion.fecha || evaluacion.fecha_eval || evaluacion.fechaEval);
+};
 
 const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
     const [datos, setDatos] = useState(null);
+    const [datosJuegos, setDatosJuegos] = useState(null);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState(null);
     const [nombre, setNombre] = useState(nombreNino || '');
@@ -37,7 +66,7 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
             try {
                 if (!nombreNino) {
                     try {
-                        const ninoResponse = await axios.get(`${NINO_API_URL}/nino/${idNino}`);
+                        const ninoResponse = await axios.get(`${API_ENDPOINTS.ninos}/nino/${idNino}`);
                         if (ninoResponse.data) {
                             setNombre(ninoResponse.data.nombre);
                             setEdad(ninoResponse.data.edad);
@@ -47,9 +76,17 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                     }
                 }
 
-                const response = await axios.get(`${API_URL}/historial-evaluaciones/${idNino}`);
-                if (response.data.status === 'success') {
-                    setDatos(response.data);
+                const [evaluacionResponse, juegosResponse] = await Promise.all([
+                    axios.get(`${API_ENDPOINTS.evaluacion}/historial-evaluaciones/${idNino}`),
+                    axios.get(`${API_ENDPOINTS.ejercicios}/progreso-juegos/${idNino}`)
+                ]);
+
+                if (evaluacionResponse.data.status === 'success') {
+                    setDatos(evaluacionResponse.data);
+                }
+
+                if (juegosResponse.data.status === 'success') {
+                    setDatosJuegos(juegosResponse.data);
                 }
             } catch (err) {
                 console.error('Error cargando progreso:', err);
@@ -92,7 +129,7 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
 
     const { evaluaciones, mejores_fonemas, peores_fonemas } = datos;
     
-    const labels = evaluaciones.map(e => `${e.tipo_evaluacion}\n${e.fecha_formateada}`);
+    const labels = evaluaciones.map(e => `${e.tipo_evaluacion} • ${getFechaTexto(e)}`);
     const puntajes = evaluaciones.map(e => e.puntaje_promedio * 100);
 
     const chartData = {
@@ -121,6 +158,53 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
         scales: {
             y: { min: 0, max: 100, title: { display: true, text: 'Puntaje (%)' } },
             x: { title: { display: true, text: 'Evaluaciones' } }
+        }
+    };
+
+    const juegosConProgreso = datosJuegos?.juegos || [];
+    const juegoLabels = juegosConProgreso.map(j => j.nombre);
+    const juegoProgresos = juegosConProgreso.map(j => j.promedio);
+
+    const juegosChartData = {
+        labels: juegoLabels,
+        datasets: [{
+            label: 'Avance por juego (%)',
+            data: juegoProgresos,
+            backgroundColor: 'rgba(231, 76, 60, 0.6)',
+            borderColor: '#c0392b',
+            borderWidth: 1,
+            borderRadius: 6,
+            maxBarThickness: 40
+        }]
+    };
+
+    const juegosChartOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            title: { display: true, text: 'Avance por videojuego', font: { size: 14 } },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `${context.parsed.y}% completado`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                min: 0,
+                max: 100,
+                title: { display: true, text: 'Progreso (%)' }
+            },
+            x: {
+                ticks: {
+                    autoSkip: false,
+                    maxRotation: 45,
+                    minRotation: 45
+                }
+            }
         }
     };
 
@@ -163,6 +247,53 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                     </div>
                 )}
 
+                {/* Progreso de juegos */}
+                {datosJuegos && datosJuegos.juegos && datosJuegos.juegos.length > 0 && (
+                    <div style={styles.gameProgressSection}>
+                        <h3 style={styles.sectionTitle}>🎮 Progreso por videojuego</h3>
+                        <div style={styles.gameSummaryCards}>
+                            <div style={styles.summaryCard}>
+                                <div style={styles.summaryValue}>{datosJuegos.total_juegos}</div>
+                                <div style={styles.summaryLabel}>Juegos totales</div>
+                            </div>
+                            <div style={styles.summaryCard}>
+                                <div style={styles.summaryValue}>{datosJuegos.juegos_con_progreso}</div>
+                                <div style={styles.summaryLabel}>Con avance</div>
+                            </div>
+                            <div style={styles.summaryCard}>
+                                <div style={styles.summaryValue}>{datosJuegos.resumen?.promedio_general || 0}%</div>
+                                <div style={styles.summaryLabel}>Avance promedio</div>
+                            </div>
+                        </div>
+
+                        <div style={styles.chartCard}>
+                            <div style={styles.chartContainer}>
+                                <Bar data={juegosChartData} options={juegosChartOptions} />
+                            </div>
+                        </div>
+
+                        <div style={styles.gameListCard}>
+                            {datosJuegos.juegos.map((juego) => (
+                                <div key={juego.id_ejercicio} style={styles.gameItem}>
+                                    <div>
+                                        <strong>{juego.nombre}</strong>
+                                        <p style={styles.gameDescription}>{juego.descripcion}</p>
+                                        <p style={styles.gameMeta}>{juego.nivel} • {juego.tipo_apoyo || 'Actividad'}</p>
+                                    </div>
+                                    <div style={styles.gameProgressInfo}>
+                                        <div style={styles.progressBarContainer}>
+                                            <div style={{ ...styles.progressBarFill, width: `${juego.promedio}%` }} />
+                                        </div>
+                                        <span style={styles.gameProgressLabel}>{juego.promedio}%</span>
+                                        <span style={styles.gameState}>{juego.estado}</span>
+                                        {juego.ultimo_fecha && <span style={styles.gameDate}>Último: {juego.ultimo_fecha}</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Dos columnas: Mejores y Peores fonemas */}
                 <div style={styles.twoColumns}>
                     {mejores_fonemas.length > 0 && (
@@ -196,7 +327,7 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                     <div style={styles.historialList}>
                         {evaluaciones.map((ev) => (
                             <div key={ev.id_ev} style={styles.historialItem}>
-                                <span>{ev.fecha_formateada}</span>
+                                <span>{getFechaTexto(ev)}</span>
                                 <span>{ev.tipo_evaluacion}</span>
                                 <span style={{
                                     ...styles.puntajeBadge,
@@ -224,7 +355,13 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                 {/* Botones */}
                 <div style={styles.actions}>
                     {evaluaciones.length > 0 && (
-                        <button style={styles.pdfButton} onClick={() => window.open(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${evaluaciones[0]?.id_ev || ''}`, '_blank')}>
+                        <button
+                            style={styles.pdfButton}
+                            onClick={() => {
+                                const ultimaEvaluacionId = evaluaciones[evaluaciones.length - 1]?.id_ev || evaluaciones[0]?.id_ev || '';
+                                window.open(`${API_ENDPOINTS.evaluacion}/generar-reporte-pdf/${idNino}/${ultimaEvaluacionId}`, '_blank');
+                            }}
+                        >
                             📄 Generar PDF
                         </button>
                     )}
@@ -326,6 +463,84 @@ const styles = {
     },
     chartContainer: {
         height: '280px'
+    },
+    gameProgressSection: {
+        backgroundColor: '#ffffffeb',
+        borderRadius: '16px',
+        padding: '18px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.08)'
+    },
+    sectionTitle: {
+        marginBottom: '16px',
+        fontSize: '20px',
+        color: '#2c3e50'
+    },
+    gameSummaryCards: {
+        display: 'flex',
+        gap: '15px',
+        marginBottom: '16px',
+        flexWrap: 'wrap'
+    },
+    gameListCard: {
+        display: 'grid',
+        gap: '12px',
+        marginTop: '16px'
+    },
+    gameItem: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '16px',
+        padding: '14px',
+        backgroundColor: '#f8fbff',
+        borderRadius: '14px',
+        border: '1px solid #dfeaf2'
+    },
+    gameDescription: {
+        margin: '8px 0 0',
+        color: '#5d6d7e',
+        fontSize: '13px',
+        lineHeight: '1.5'
+    },
+    gameMeta: {
+        margin: '6px 0 0',
+        fontSize: '12px',
+        color: '#95a5a6'
+    },
+    gameProgressInfo: {
+        minWidth: '180px',
+        textAlign: 'right',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: '6px'
+    },
+    progressBarContainer: {
+        width: '160px',
+        height: '10px',
+        backgroundColor: '#e9ebed',
+        borderRadius: '999px',
+        overflow: 'hidden'
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#e74c3c',
+        borderRadius: '999px',
+        transition: 'width 0.35s ease'
+    },
+    gameProgressLabel: {
+        fontSize: '13px',
+        fontWeight: '700',
+        color: '#2c3e50'
+    },
+    gameState: {
+        fontSize: '12px',
+        color: '#7f8c8d'
+    },
+    gameDate: {
+        fontSize: '11px',
+        color: '#95a5a6'
     },
     twoColumns: {
         display: 'flex',

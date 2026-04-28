@@ -147,6 +147,106 @@ async def obtener_sesion_practica(id_nino: int):
         logger.error(f"Error creando sesión de práctica: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/progreso-juegos/{id_nino}")
+async def obtener_progreso_juegos(id_nino: int):
+    """Obtiene el avance por cada juego / ejercicio del niño para mostrar en el progreso."""
+    try:
+        from controllers.evaluacion_controller import construir_plan_personalizado
+
+        plan = construir_plan_personalizado(id_nino)
+        ejercicios_plan = plan.get('plan_adaptativo', [])
+        ejercicios_index = {
+            ej.get('id_ejercicio'): ej
+            for ej in ejercicios_plan
+            if ej.get('id_ejercicio')
+        }
+
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT p.id_ejercicio, p.puntaje_obtenido, p.tiempo_empleado,
+                       p.intento_numero, p.fecha_realizacion,
+                       c.nombre_ejercicio, c.nivel_dificultad, c.descripcion_instrucciones,
+                       c.tipo_apoyo
+                FROM progreso_nino p
+                LEFT JOIN catalogo_ejercicios c ON p.id_ejercicio = c.id_ejercicio
+                WHERE p.id_nino = %s
+                ORDER BY p.fecha_realizacion ASC
+            """, (id_nino,))
+            progreso_rows = cursor.fetchall()
+
+        juegos_map = {}
+        for row in progreso_rows:
+            juego = juegos_map.setdefault(row['id_ejercicio'], {
+                'id_ejercicio': row['id_ejercicio'],
+                'nombre': row.get('nombre_ejercicio') or ejercicios_index.get(row['id_ejercicio'], {}).get('nombre_ejercicio', 'Juego'),
+                'descripcion': row.get('descripcion_instrucciones') or ejercicios_index.get(row['id_ejercicio'], {}).get('descripcion_instrucciones', ''),
+                'nivel': row.get('nivel_dificultad') or ejercicios_index.get(row['id_ejercicio'], {}).get('nivel_dificultad', 'Bajo'),
+                'tipo_apoyo': row.get('tipo_apoyo') or ejercicios_index.get(row['id_ejercicio'], {}).get('tipo_apoyo', ''),
+                'intentos': 0,
+                'puntajes': [],
+                'tiempo_total': 0,
+                'ultimo_intento': None,
+                'ultima_fecha': None
+            })
+            juego['intentos'] += 1
+            juego['puntajes'].append(row['puntaje_obtenido'] or 0)
+            juego['tiempo_total'] += row['tiempo_empleado'] or 0
+            if row['fecha_realizacion']:
+                juego['ultima_fecha'] = row['fecha_realizacion'].strftime('%d/%m/%Y')
+            juego['ultimo_intento'] = row['intento_numero']
+
+        juegos = []
+        for ej in ejercicios_plan:
+            id_ejercicio = ej.get('id_ejercicio')
+            registro = juegos_map.get(id_ejercicio, None)
+            promedio = 0
+            progreso = 0
+            intentos = 0
+            ultimo_fecha = None
+            tiempo_total = 0
+            estado = 'Pendiente'
+            if registro:
+                intentos = registro['intentos']
+                promedio = sum(registro['puntajes']) / len(registro['puntajes']) if registro['puntajes'] else 0
+                progreso = round(promedio * 100)
+                ultimo_fecha = registro['ultima_fecha']
+                tiempo_total = registro['tiempo_total']
+                estado = 'Listo' if promedio >= 0.7 else 'En progreso'
+
+            juegos.append({
+                'id_ejercicio': id_ejercicio,
+                'nombre': ej.get('nombre_ejercicio'),
+                'descripcion': ej.get('descripcion_instrucciones'),
+                'nivel': ej.get('nivel_dificultad'),
+                'tipo_apoyo': ej.get('tipo_apoyo'),
+                'intentos': intentos,
+                'promedio': round(promedio * 100),
+                'ultimo_fecha': ultimo_fecha,
+                'tiempo_total': tiempo_total,
+                'estado': estado
+            })
+
+        total_juegos = len(juegos)
+        juegos_con_progreso = len([j for j in juegos if j['intentos'] > 0])
+        promedio_general = round((sum(j['promedio'] for j in juegos) / total_juegos) if total_juegos else 0)
+
+        return {
+            'status': 'success',
+            'id_nino': id_nino,
+            'total_juegos': total_juegos,
+            'juegos_con_progreso': juegos_con_progreso,
+            'juegos': juegos,
+            'resumen': {
+                'promedio_general': promedio_general,
+                'pendientes': total_juegos - juegos_con_progreso,
+                'ultimo_actualizado': max((j['ultimo_fecha'] for j in juegos if j['ultimo_fecha']), default=None)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo progreso de juegos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/ejercicios-por-nivel/{id_nino}")
 async def obtener_ejercicios_por_nivel(id_nino: int):
     """

@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import TutorDashboard from './pages/TutorDashboard';
 import NinoDashboard from './pages/NinoDashboard';
+import JuegosDashboard from './pages/JuegosDashboard';
 import ProgresoPage from './pages/ProgresoPage';
 import EvaluacionPage from './pages/EvaluacionPage';
 
@@ -56,13 +57,23 @@ function App() {
 
   // Redirigir según el rol
   if (user.id_rol === 3 || user.rol === 'nino') {
+    if (vistaActual === 'juegos') {
+      return (
+        <JuegosDashboard
+          idNino={user.id_nino}
+          onBack={() => setVistaActual('dashboard')}
+        />
+      );
+    }
+
     return (
       <NinoDashboard 
         usuario={user} 
         onLogout={() => {
           localStorage.removeItem('user');
           setUser(null);
-        }} 
+        }}
+        onVerJuegos={() => setVistaActual('juegos')}
       />
     );
   }
