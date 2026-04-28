@@ -4,9 +4,10 @@ const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
     const [preguntas, setPreguntas] = useState([]);
     const [edad, setEdad] = useState(0);
     const [nombreNino, setNombreNino] = useState(nombre || 'Niño');
-    const [respuestas, setRespuestas] = useState({}); // {id_hecho: valor}
+    const [respuestas, setRespuestas] = useState({});
     const [loading, setLoading] = useState(true);
     const [mensaje, setMensaje] = useState('');
+    const [progreso, setProgreso] = useState(0);
 
     useEffect(() => {
         const cargarPreguntas = async () => {
@@ -44,6 +45,13 @@ const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
 
         cargarPreguntas();
     }, [id_nino, nombre]);
+
+    // Actualizar progreso cuando cambian las respuestas
+    useEffect(() => {
+        const respondidas = Object.keys(respuestas).length;
+        const total = preguntas.length;
+        setProgreso(total > 0 ? (respondidas / total) * 100 : 0);
+    }, [respuestas, preguntas]);
 
     const handleOptionChange = (id_hecho, valor) => {
         setRespuestas({ ...respuestas, [id_hecho]: valor });
@@ -88,9 +96,12 @@ const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
 
     if (loading) {
         return (
-            <div style={styles.loadingContainer}>
-                <div style={styles.spinner}></div>
-                <p>Cargando preguntas...</p>
+            <div style={styles.container}>
+                <div style={styles.backgroundImage} />
+                <div style={styles.loadingContainer}>
+                    <div style={styles.spinner}></div>
+                    <p>Cargando preguntas...</p>
+                </div>
             </div>
         );
     }
@@ -98,185 +109,314 @@ const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
     if (!id_nino) {
         return (
             <div style={styles.container}>
-                <p style={styles.errorMessage}>No se encontró el niño seleccionado. Vuelve al dashboard y elige un niño válido.</p>
-                <button style={styles.backButton} onClick={onFinish}>Volver</button>
+                <div style={styles.backgroundImage} />
+                <div style={styles.content}>
+                    <button style={styles.backButton} onClick={onFinish}>← Volver</button>
+                    <div style={styles.errorCard}>
+                        <p>No se encontró el niño seleccionado. Vuelve al dashboard y elige un niño válido.</p>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
         <div style={styles.container}>
-            <div style={styles.header}>
-                <h1 style={styles.title}>Anamnesis para {nombreNino}</h1>
-                <p style={styles.subtitle}>Edad: {edad} años</p>
-            </div>
-
-            {mensaje && (
-                <div style={styles.errorMessage}>{mensaje}</div>
-            )}
-
-            {preguntas.length === 0 ? (
-                <div style={styles.noQuestions}>
-                    <p>No hay preguntas disponibles para este niño en este momento.</p>
-                    <button style={styles.backButton} onClick={onFinish}>Volver</button>
+            {/* Fondo de imagen */}
+            <div style={styles.backgroundImage} />
+            
+            {/* Contenido */}
+            <div style={styles.content}>
+                <button style={styles.backButton} onClick={onFinish}>← Volver</button>
+                
+                <div style={styles.header}>
+                    <h1 style={styles.title}>📋 Anamnesis</h1>
+                    <p style={styles.subtitle}>Paciente: {nombreNino} | Edad: {edad} años</p>
                 </div>
-            ) : (
-                <div style={styles.formList}>
-                    {preguntas.map(p => (
-                        <div key={p.id_hecho} style={styles.preguntaCard}>
-                            <div>
-                                <p style={styles.questionText}>{p.descripcion_hecho}</p>
-                                <p style={styles.category}>Categoría: {p.categoria}</p>
-                            </div>
-                            <div style={styles.options}>
-                                <button
-                                    type="button"
-                                    onClick={() => handleOptionChange(p.id_hecho, 1)}
-                                    style={respuestas[p.id_hecho] === 1 ? styles.btnActive : styles.btn}
-                                >Presente</button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleOptionChange(p.id_hecho, 0)}
-                                    style={respuestas[p.id_hecho] === 0 ? styles.btnActive : styles.btn}
-                                >Ausente</button>
-                            </div>
+
+                {/* Barra de progreso */}
+                <div style={styles.progressSection}>
+                    <div style={styles.progressBarContainer}>
+                        <div style={{ ...styles.progressBarFill, width: `${progreso}%` }} />
+                    </div>
+                    <p style={styles.progressText}>{Math.round(progreso)}% completado</p>
+                </div>
+
+                {mensaje && (
+                    <div style={styles.errorMessage}>{mensaje}</div>
+                )}
+
+                {preguntas.length === 0 ? (
+                    <div style={styles.emptyCard}>
+                        <p>No hay preguntas disponibles para este niño en este momento.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div style={styles.preguntasContainer}>
+                            {preguntas.map(p => (
+                                <div key={p.id_hecho} style={styles.preguntaCard}>
+                                    <div style={styles.preguntaContent}>
+                                        <p style={styles.questionText}>{p.descripcion_hecho}</p>
+                                        <p style={styles.category}>📂 {p.categoria}</p>
+                                    </div>
+                                    <div style={styles.options}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOptionChange(p.id_hecho, 1)}
+                                            style={respuestas[p.id_hecho] === 1 ? styles.btnPresenteActive : styles.btnPresente}
+                                        >
+                                            ✓ Presente
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOptionChange(p.id_hecho, 0)}
+                                            style={respuestas[p.id_hecho] === 0 ? styles.btnAusenteActive : styles.btnAusente}
+                                        >
+                                            ✗ Ausente
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                    <button type="button" onClick={guardarAnamnesis} style={styles.saveBtn}>Finalizar y Guardar</button>
-                    <button type="button" onClick={onFinish} style={styles.backButton}>Volver</button>
-                </div>
-            )}
+
+                        <div style={styles.actions}>
+                            <button onClick={guardarAnamnesis} style={styles.saveButton}>
+                                Guardar y Finalizar
+                            </button>
+                            <button onClick={onFinish} style={styles.cancelButton}>
+                                Cancelar
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 };
 
 const styles = {
     container: {
-        padding: '30px',
-        maxWidth: '900px',
-        margin: 'auto',
-        backgroundColor: '#f8f9fa',
+        position: 'relative',
         minHeight: '100vh',
-        fontFamily: 'Arial, sans-serif'
+        overflowY: 'auto'
     },
-    loadingContainer: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: '#555'
+    backgroundImage: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: 'url("/images/anamnesis.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        zIndex: 0
     },
-    spinner: {
-        border: '4px solid rgba(0,0,0,0.1)',
-        borderTop: '4px solid #3498db',
-        borderRadius: '50%',
-        width: '40px',
-        height: '40px',
-        animation: 'spin 1s linear infinite'
+    content: {
+        position: 'relative',
+        zIndex: 1,
+        maxWidth: '800px',
+        margin: '0 30px 0 auto',
+        padding: '20px',
+        backgroundColor: 'rgba(255, 255, 255, 0.71)',
+        borderRadius: '20px',
+        minHeight: '100vh'
+    },
+    backButton: {
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '20px',
+        cursor: 'pointer',
+        marginBottom: '20px',
+        fontSize: '13px'
     },
     header: {
         textAlign: 'center',
         marginBottom: '25px'
     },
     title: {
-        margin: '0 0 10px 0',
-        fontSize: '32px',
-        color: '#2c3e50'
+        fontSize: '28px',
+        color: '#2c3e50',
+        margin: '0 0 8px'
     },
     subtitle: {
-        margin: 0,
-        color: '#7f8c8d',
-        fontSize: '18px'
+        fontSize: '14px',
+        color: '#363838',
+        margin: 0
+    },
+    progressSection: {
+        marginBottom: '25px'
+    },
+    progressBarContainer: {
+        backgroundColor: '#e0e0e0',
+        borderRadius: '10px',
+        height: '8px',
+        overflow: 'hidden'
+    },
+    progressBarFill: {
+        backgroundColor: '#27ae60',
+        height: '100%',
+        borderRadius: '10px',
+        transition: 'width 0.3s ease'
+    },
+    progressText: {
+        fontSize: '12px',
+        color: '#404243',
+        marginTop: '8px',
+        textAlign: 'center'
     },
     errorMessage: {
         backgroundColor: '#f8d7da',
         color: '#721c24',
-        padding: '15px',
-        borderRadius: '8px',
+        padding: '12px',
+        borderRadius: '10px',
         marginBottom: '20px',
         textAlign: 'center'
     },
-    noQuestions: {
-        textAlign: 'center',
-        padding: '30px',
-        backgroundColor: '#fff',
-        borderRadius: '12px',
-        border: '1px solid #e9ecef'
-    },
-    formList: {
+    preguntasContainer: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '15px'
+        gap: '15px',
+        marginBottom: '25px',
+        maxHeight: '60vh',
+        overflowY: 'auto',
+        paddingRight: '5px'
     },
     preguntaCard: {
-        backgroundColor: '#fff',
-        padding: '20px',
-        borderRadius: '10px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '16px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-        border: '1px solid #e9ecef'
+        flexWrap: 'wrap',
+        gap: '15px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        borderLeft: '4px solid #3498db'
+    },
+    preguntaContent: {
+        flex: 1
     },
     questionText: {
-        fontSize: '16px',
-        fontWeight: 'bold',
-        margin: '0 0 10px 0'
+        fontSize: '15px',
+        fontWeight: '500',
+        color: '#2c3e50',
+        margin: '0 0 5px'
     },
     category: {
-        margin: 0,
-        color: '#6c757d',
-        fontSize: '14px'
+        fontSize: '12px',
+        color: '#7f8c8d',
+        margin: 0
     },
     options: {
         display: 'flex',
-        gap: '12px'
+        gap: '10px'
     },
-    btn: {
-        padding: '10px 18px',
-        borderRadius: '6px',
-        border: '2px solid #007bff',
+    btnPresente: {
+        backgroundColor: '#f8f9fa',
+        color: '#27ae60',
+        border: '1px solid #27ae60',
+        padding: '8px 16px',
+        borderRadius: '25px',
         cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        backgroundColor: '#fff',
-        color: '#007bff'
+        fontSize: '13px',
+        fontWeight: '500'
     },
-    btnActive: {
-        padding: '10px 18px',
-        borderRadius: '6px',
+    btnPresenteActive: {
+        backgroundColor: '#27ae60',
+        color: 'white',
         border: 'none',
-        backgroundColor: '#007bff',
-        color: '#fff',
+        padding: '8px 16px',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
+    btnAusente: {
+        backgroundColor: '#f8f9fa',
+        color: '#e74c3c',
+        border: '1px solid #e74c3c',
+        padding: '8px 16px',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
+    btnAusenteActive: {
+        backgroundColor: '#e74c3c',
+        color: 'white',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
+    actions: {
+        display: 'flex',
+        gap: '15px',
+        justifyContent: 'center',
+        marginTop: '10px'
+    },
+    saveButton: {
+        backgroundColor: '#27ae60',
+        color: 'white',
+        border: 'none',
+        padding: '12px 24px',
+        borderRadius: '30px',
         cursor: 'pointer',
         fontSize: '14px',
         fontWeight: 'bold'
     },
-    saveBtn: {
-        width: '100%',
-        padding: '15px',
-        backgroundColor: '#28a745',
-        color: '#fff',
-        border: 'none',
-        borderRadius: '8px',
-        marginTop: '10px',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-        fontSize: '16px'
-    },
-    backButton: {
-        width: '100%',
-        padding: '15px',
+    cancelButton: {
         backgroundColor: '#6c757d',
-        color: '#fff',
+        color: 'white',
         border: 'none',
-        borderRadius: '8px',
-        marginTop: '10px',
-        fontWeight: 'bold',
+        padding: '12px 24px',
+        borderRadius: '30px',
         cursor: 'pointer',
-        fontSize: '16px'
+        fontSize: '14px'
+    },
+    loadingContainer: {
+        position: 'relative',
+        zIndex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        backgroundColor: 'rgba(255,255,255,0.9)'
+    },
+    spinner: {
+        border: '4px solid #f3f3f3',
+        borderTop: '4px solid #2c3e50',
+        borderRadius: '50%',
+        width: '40px',
+        height: '40px',
+        animation: 'spin 1s linear infinite',
+        marginBottom: '15px'
+    },
+    emptyCard: {
+        textAlign: 'center',
+        padding: '40px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        color: '#7f8c8d'
+    },
+    errorCard: {
+        textAlign: 'center',
+        padding: '40px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        color: '#e74c3c'
     }
 };
+
+// Añadir keyframes
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+document.head.appendChild(styleSheet);
 
 export default AnamnesisForm;

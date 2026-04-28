@@ -6,7 +6,7 @@ import ResultadosDiagnostico from '../components/Evaluacion/ResultadosDiagnostic
 import { iniciarEvaluacion } from '../api/evaluacionService';
 import ModuloExplicativo from '../components/Explicacion/ModuloExplicativo';
 
-const TutorDashboard = ({ usuario, onLogout, onVerProgreso }) => {
+const TutorDashboard = ({ usuario, onLogout, onVerProgreso, onIniciarEvaluacion }) => {
     const [ninos, setNinos] = useState([]);
     const [nuevoNino, setNuevoNino] = useState({
         nombre: '', f_nac: '', genero: 'M', escolaridad: 'Inicial', parentesco: 'Padre/Madre'
@@ -107,9 +107,8 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso }) => {
                 setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 4000);
                 return;
             }
-            setSelectedNino(nino);
-            setIdEvaluacionActual(response.id_evaluacion);
-            setShowEvaluacion(true);
+            // Usar la prop para navegar a la página de evaluación
+            onIniciarEvaluacion(nino);
         } catch (error) {
             console.error('Error al iniciar evaluación:', error);
             setMensaje({ texto: "Error al iniciar la sesión de evaluación", tipo: 'error', mostrar: true });
@@ -197,7 +196,7 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso }) => {
     if (mostrarSelectorEvaluacion) {
         return (
             <div style={styles.selectorContainer}>
-                {/* Video de fondo */}
+                {/* Fondo de imagen */}
                 <div style={{
                     position: 'absolute',
                     top: 0,
@@ -425,21 +424,21 @@ const styles = {
         textAlign: 'left'
     },
     welcomeMessage: {
-        fontSize: '14px',
+        fontSize: '25px',
         color: 'rgba(255, 255, 255, 0.9)',
         marginTop: '8px',
         fontWeight: '500',
-        textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+        textShadow: '2px 2px 3px rgba(0,0,0,0.3)'
     },
     title: {
-        fontSize: '28px',
+        fontSize: '45px',
         fontWeight: 'bold',
         color: 'white',
         textShadow: '1px 1px 4px rgba(0,0,0,0.5)',
         margin: 0
     },
     subtitle: {
-        fontSize: '14px',
+        fontSize: '20px',
         color: 'rgba(255,255,255,0.8)',
         margin: '5px 0 0',
         textShadow: '1px 1px 2px rgba(0,0,0,0.5)'

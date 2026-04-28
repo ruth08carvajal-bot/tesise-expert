@@ -109,7 +109,36 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                 }
             
             # =========================================================
-            # PASO 4: Verificar fecha de última evaluación
+            # PASO 4: Verificar si la última evaluación tiene diagnóstico
+            # (Si está incompleta, permitir nueva evaluación)
+            # =========================================================
+            cursor.execute("""
+                SELECT diagnostico_sistema FROM evaluacion_sesion 
+                WHERE id_ev = %s
+            """, (ultima_evaluacion['id_ev'],))
+            
+            resultado_diagnostico = cursor.fetchone()
+            tiene_diagnostico = resultado_diagnostico and resultado_diagnostico.get('diagnostico_sistema')
+            
+            # Si la evaluación está incompleta (sin diagnóstico), permitir nueva
+            if not tiene_diagnostico:
+                query = """
+                    INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 
+                    VALUES (%s, 'Control')
+                """
+                cursor.execute(query, (id_nino,))
+                id_evaluacion = cursor.lastrowid
+                conn.commit()
+                return {
+                    "status": "success", 
+                    "id_evaluacion": id_evaluacion,
+                    "tipo": "Control",
+                    "edad": edad,
+                    "mensaje": f"Nueva evaluación creada (la anterior no se completó)"
+                }
+            
+            # =========================================================
+            # PASO 5: Verificar fecha de última evaluación completa
             # =========================================================
             fecha_ultima = ultima_evaluacion['fecha_eval']
             
@@ -131,7 +160,7 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                 }
             
             # =========================================================
-            # PASO 5: Convertir a date si es datetime y calcular meses
+            # PASO 6: Convertir a date si es datetime y calcular meses
             # =========================================================
             hoy = datetime.now().date()
             if isinstance(fecha_ultima, datetime):
@@ -140,7 +169,7 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
             meses_diferencia = (hoy.year - fecha_ultima.year) * 12 + (hoy.month - fecha_ultima.month)
             
             # =========================================================
-            # PASO 6: Si pasaron menos de 3 meses → NO permitir
+            # PASO 7: Si pasaron menos de 3 meses → NO permitir
             # =========================================================
             if meses_diferencia < 3:
                 return {
@@ -154,7 +183,7 @@ async def iniciar_evaluacion(id_nino: int = Form(...)):
                 }
             
             # =========================================================
-            # PASO 7: Si pasaron 3 meses o más → crear reevaluación (CONTROL)
+            # PASO 8: Si pasaron 3 meses o más → crear reevaluación (CONTROL)
             # =========================================================
             query = """
                 INSERT INTO evaluacion_sesion (id_nino, tipo_evaluacion) 

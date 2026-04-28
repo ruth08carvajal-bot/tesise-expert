@@ -4,11 +4,13 @@ import RegisterPage from './pages/RegisterPage';
 import TutorDashboard from './pages/TutorDashboard';
 import NinoDashboard from './pages/NinoDashboard';
 import ProgresoPage from './pages/ProgresoPage';
+import EvaluacionPage from './pages/EvaluacionPage';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [vistaActual, setVistaActual] = useState('login'); // 'login', 'registro', 'progreso'
-  const [ninoProgreso, setNinoProgreso] = useState(null); // Niño seleccionado para ver progreso
+  const [vistaActual, setVistaActual] = useState('login'); // 'login', 'registro', 'progreso', 'evaluacion'
+  const [ninoProgreso, setNinoProgreso] = useState(null);
+  const [evaluacionNino, setEvaluacionNino] = useState(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -28,9 +30,16 @@ function App() {
     setVistaActual('progreso');
   };
 
+  // Función para iniciar evaluación
+  const iniciarEvaluacionNino = (nino) => {
+    setEvaluacionNino(nino);
+    setVistaActual('evaluacion');
+  };
+
   // Función para volver al dashboard
   const volverAlDashboard = () => {
     setNinoProgreso(null);
+    setEvaluacionNino(null);
     setVistaActual('dashboard');
   };
 
@@ -69,6 +78,16 @@ function App() {
     );
   }
 
+  // Vista de evaluación
+  if (vistaActual === 'evaluacion' && evaluacionNino) {
+    return (
+      <EvaluacionPage 
+        idNino={evaluacionNino.id_nino} 
+        onBack={volverAlDashboard} 
+      />
+    );
+  }
+
   // Vista del dashboard del tutor
   return (
     <TutorDashboard 
@@ -78,6 +97,7 @@ function App() {
         setUser(null);
       }} 
       onVerProgreso={verProgreso}
+      onIniciarEvaluacion={iniciarEvaluacionNino}
     />
   );
 }

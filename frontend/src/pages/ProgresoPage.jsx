@@ -35,7 +35,6 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
     useEffect(() => {
         const cargarDatos = async () => {
             try {
-                // Obtener datos del niño si no se pasó el nombre
                 if (!nombreNino) {
                     try {
                         const ninoResponse = await axios.get(`${NINO_API_URL}/nino/${idNino}`);
@@ -48,7 +47,6 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                     }
                 }
 
-                // Obtener historial de evaluaciones
                 const response = await axios.get(`${API_URL}/historial-evaluaciones/${idNino}`);
                 if (response.data.status === 'success') {
                     setDatos(response.data);
@@ -68,9 +66,12 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
 
     if (cargando) {
         return (
-            <div style={styles.loadingContainer}>
-                <div style={styles.spinner}></div>
-                <p>Cargando datos de progreso...</p>
+            <div style={styles.container}>
+                <div style={styles.backgroundImage} />
+                <div style={styles.loadingContainer}>
+                    <div style={styles.spinner}></div>
+                    <p>Cargando datos de progreso...</p>
+                </div>
             </div>
         );
     }
@@ -78,13 +79,12 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
     if (error || !datos || datos.evaluaciones.length === 0) {
         return (
             <div style={styles.container}>
-                <div style={styles.header}>
-                    <button style={styles.backButton} onClick={onBack}>
-                        ⬅ Volver al Dashboard
-                    </button>
-                </div>
-                <div style={styles.errorCard}>
-                    <p style={styles.errorText}>{error || 'No hay suficientes evaluaciones para mostrar el progreso'}</p>
+                <div style={styles.backgroundImage} />
+                <div style={styles.content}>
+                    <button style={styles.backButton} onClick={onBack}>← Volver</button>
+                    <div style={styles.errorCard}>
+                        <p>{error || 'No hay suficientes evaluaciones para mostrar el progreso'}</p>
+                    </div>
                 </div>
             </div>
         );
@@ -92,27 +92,23 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
 
     const { evaluaciones, mejores_fonemas, peores_fonemas } = datos;
     
-    // Preparar datos para el gráfico
     const labels = evaluaciones.map(e => `${e.tipo_evaluacion}\n${e.fecha_formateada}`);
     const puntajes = evaluaciones.map(e => e.puntaje_promedio * 100);
 
     const chartData = {
         labels: labels,
-        datasets: [
-            {
-                label: 'Puntaje promedio (%)',
-                data: puntajes,
-                borderColor: 'rgb(52, 152, 219)',
-                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                tension: 0.3,
-                fill: true,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointBackgroundColor: 'rgb(52, 152, 219)',
-                pointBorderColor: 'white',
-                pointBorderWidth: 2,
-            }
-        ]
+        datasets: [{
+            label: 'Puntaje promedio (%)',
+            data: puntajes,
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 5,
+            pointBackgroundColor: '#3498db',
+            pointBorderColor: 'white',
+            pointBorderWidth: 2
+        }]
     };
 
     const chartOptions = {
@@ -120,8 +116,7 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
         maintainAspectRatio: true,
         plugins: {
             legend: { position: 'top' },
-            title: { display: true, text: 'Evolución del rendimiento', font: { size: 16 } },
-            tooltip: { callbacks: { label: (ctx) => `Puntaje: ${ctx.parsed.y.toFixed(1)}%` } }
+            title: { display: true, text: 'Evolución del rendimiento', font: { size: 14 } }
         },
         scales: {
             y: { min: 0, max: 100, title: { display: true, text: 'Puntaje (%)' } },
@@ -131,140 +126,110 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
 
     return (
         <div style={styles.container}>
-            {/* Cabecera */}
-            <div style={styles.header}>
-                <button style={styles.backButton} onClick={onBack}>
-                    ⬅ Volver al Dashboard
-                </button>
-                <h1 style={styles.title}>📈 Progreso de {nombre || `Niño ${idNino}`}</h1>
-                {edad > 0 && (
-                    <div style={styles.infoBadge}>
-                        <span>{edad} años</span>
+            {/* Fondo de imagen */}
+            <div style={styles.backgroundImage} />
+            
+            {/* Contenido */}
+            <div style={styles.content}>
+                <button style={styles.backButton} onClick={onBack}>← Volver</button>
+                
+                <div style={styles.header}>
+                    <h1 style={styles.title}>📈 Progreso de {nombre || `Niño ${idNino}`}</h1>
+                    {edad > 0 && <span style={styles.ageBadge}>{edad} años</span>}
+                </div>
+
+                {/* Tarjetas resumen */}
+                <div style={styles.summaryCards}>
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryValue}>{evaluaciones.length}</div>
+                        <div style={styles.summaryLabel}>Evaluaciones</div>
+                    </div>
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryValue}>{mejores_fonemas.length}</div>
+                        <div style={styles.summaryLabel}>✅ Correctos</div>
+                    </div>
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryValue}>{peores_fonemas.length}</div>
+                        <div style={styles.summaryLabel}>🔴 Por mejorar</div>
+                    </div>
+                </div>
+
+                {/* Gráfico */}
+                {evaluaciones.length >= 2 && (
+                    <div style={styles.chartCard}>
+                        <div style={styles.chartContainer}>
+                            <Line data={chartData} options={chartOptions} />
+                        </div>
                     </div>
                 )}
-            </div>
 
-            {/* Resumen */}
-            <div style={styles.summaryCard}>
-                <div style={styles.summaryItem}>
-                    <span style={styles.summaryValue}>{evaluaciones.length}</span>
-                    <span style={styles.summaryLabel}>Evaluaciones</span>
-                </div>
-                <div style={styles.summaryDivider}></div>
-                <div style={styles.summaryItem}>
-                    <span style={styles.summaryValue}>{mejores_fonemas.length}</span>
-                    <span style={styles.summaryLabel}>✅ Fonemas correctos</span>
-                </div>
-                <div style={styles.summaryDivider}></div>
-                <div style={styles.summaryItem}>
-                    <span style={styles.summaryValue}>{peores_fonemas.length}</span>
-                    <span style={styles.summaryLabel}>🔴 Por mejorar</span>
-                </div>
-            </div>
-
-            {/* Gráfico */}
-            {evaluaciones.length >= 2 && (
-                <div style={styles.chartCard}>
-                    <h3 style={styles.sectionTitle}>📊 Evolución del rendimiento</h3>
-                    <div style={styles.chartContainer}>
-                        <Line data={chartData} options={chartOptions} />
-                    </div>
-                    <p style={styles.chartNote}>
-                        💡 El puntaje promedio se calcula de todos los fonemas evaluados en cada sesión.
-                    </p>
-                </div>
-            )}
-
-            {/* Fonemas con mejor rendimiento */}
-            {mejores_fonemas.length > 0 && (
-                <div style={styles.successCard}>
-                    <h3 style={styles.sectionTitle}>✅ Fonemas con mejor rendimiento ({mejores_fonemas.length})</h3>
-                    <div style={styles.fonemasGrid}>
-                        {mejores_fonemas.map((f, idx) => (
-                            <div key={idx} style={styles.fonemaCardSuccess}>
-                                <span style={styles.fonemaNombre}>{f.descripcion}</span>
-                                <span style={styles.fonemaScore}>{Math.round(f.promedio * 100)}%</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Fonemas que requieren refuerzo */}
-            {peores_fonemas.length > 0 && (
-                <div style={styles.dangerCard}>
-                    <h3 style={styles.sectionTitle}>🔴 Fonemas que requieren refuerzo ({peores_fonemas.length})</h3>
-                    <div style={styles.fonemasGrid}>
-                        {peores_fonemas.map((f, idx) => (
-                            <div key={idx} style={styles.fonemaCardDanger}>
-                                <span style={styles.fonemaNombre}>{f.descripcion}</span>
-                                <span style={styles.fonemaScore}>{Math.round(f.promedio * 100)}%</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Historial de evaluaciones */}
-            <div style={styles.historialCard}>
-                <h3 style={styles.sectionTitle}>📅 Historial de evaluaciones</h3>
-                <div style={styles.tableContainer}>
-                    <table style={styles.table}>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Fecha</th>
-                                <th>Tipo</th>
-                                <th>Puntaje</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {evaluaciones.map((ev) => (
-                                <tr key={ev.id_ev}>
-                                    <td>#{ev.id_ev}</td>
-                                    <td>{ev.fecha_formateada}</td>
-                                    <td>{ev.tipo_evaluacion}</td>
-                                    <td>
-                                        <span style={{
-                                            ...styles.puntajeBadge,
-                                            backgroundColor: ev.puntaje_promedio >= 0.7 ? '#d4edda' : ev.puntaje_promedio >= 0.4 ? '#fff3cd' : '#f8d7da',
-                                            color: ev.puntaje_promedio >= 0.7 ? '#155724' : ev.puntaje_promedio >= 0.4 ? '#856404' : '#721c24'
-                                        }}>
-                                            {Math.round(ev.puntaje_promedio * 100)}%
-                                        </span>
-                                    </td>
-                                </tr>
+                {/* Dos columnas: Mejores y Peores fonemas */}
+                <div style={styles.twoColumns}>
+                    {mejores_fonemas.length > 0 && (
+                        <div style={styles.successCard}>
+                            <h3>✅ Mejor rendimiento</h3>
+                            {mejores_fonemas.slice(0, 5).map((f, idx) => (
+                                <div key={idx} style={styles.fonemaRow}>
+                                    <span>{f.descripcion}</span>
+                                    <span style={styles.scoreGood}>{Math.round(f.promedio * 100)}%</span>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
+                        </div>
+                    )}
+
+                    {peores_fonemas.length > 0 && (
+                        <div style={styles.dangerCard}>
+                            <h3>🔴 Requieren refuerzo</h3>
+                            {peores_fonemas.slice(0, 5).map((f, idx) => (
+                                <div key={idx} style={styles.fonemaRow}>
+                                    <span>{f.descripcion}</span>
+                                    <span style={styles.scoreBad}>{Math.round(f.promedio * 100)}%</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-            </div>
 
-            {/* Recomendaciones */}
-            <div style={styles.recomendacionesCard}>
-                <h3 style={styles.sectionTitle}>💡 Recomendaciones</h3>
-                <ul style={styles.recomendacionesList}>
-                    <li>Practicar los fonemas marcados como "requieren refuerzo" al menos 10 minutos al día.</li>
-                    <li>Utilizar un espejo durante la práctica para que el niño vea cómo se mueve su boca.</li>
-                    <li>Mantener sesiones cortas (10-15 minutos) pero constantes (3-4 veces por semana).</li>
-                    <li>Celebrar los logros del niño, incluso los pequeños avances.</li>
-                    <li>Programar la próxima evaluación en 3 meses para seguir el progreso.</li>
-                </ul>
-            </div>
+                {/* Historial de evaluaciones (compacto) */}
+                <div style={styles.historialCard}>
+                    <h3>📅 Historial</h3>
+                    <div style={styles.historialList}>
+                        {evaluaciones.map((ev) => (
+                            <div key={ev.id_ev} style={styles.historialItem}>
+                                <span>{ev.fecha_formateada}</span>
+                                <span>{ev.tipo_evaluacion}</span>
+                                <span style={{
+                                    ...styles.puntajeBadge,
+                                    backgroundColor: ev.puntaje_promedio >= 0.7 ? '#27ae60' : ev.puntaje_promedio >= 0.4 ? '#f39c12' : '#e74c3c',
+                                    color: '#ffffff'
+                                }}>
+                                    {Math.round(ev.puntaje_promedio * 100)}%
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
-            {/* Botón acciones */}
-            <div style={styles.actions}>
-                {evaluaciones.length > 0 && (
-                    <button 
-                        style={styles.pdfButton} 
-                        onClick={() => window.open(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${evaluaciones[0]?.id_ev || ''}`, '_blank')}
-                    >
-                        📄 Generar Reporte PDF
-                    </button>
-                )}
-                <button style={styles.backButtonFooter} onClick={onBack}>
-                    ⬅ Volver al Dashboard
-                </button>
+                {/* Recomendaciones compactas */}
+                <div style={styles.recomendacionesCard}>
+                    <h3>💡 Recomendaciones</h3>
+                    <ul style={styles.recomendacionesList}>
+                        <li>Practicar los fonemas marcados como "requieren refuerzo" al menos 10 minutos al día.</li>
+                        <li>Utilizar un espejo durante la práctica.</li>
+                        <li>Mantener sesiones cortas (10-15 minutos) pero constantes.</li>
+                        <li>Programar la próxima evaluación en 3 meses.</li>
+                    </ul>
+                </div>
+
+                {/* Botones */}
+                <div style={styles.actions}>
+                    {evaluaciones.length > 0 && (
+                        <button style={styles.pdfButton} onClick={() => window.open(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${evaluaciones[0]?.id_ev || ''}`, '_blank')}>
+                            📄 Generar PDF
+                        </button>
+                    )}
+                    <button style={styles.closeButton} onClick={onBack}>Cerrar</button>
+                </div>
             </div>
         </div>
     );
@@ -272,17 +237,207 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
 
 const styles = {
     container: {
+        position: 'relative',
         minHeight: '100vh',
-        backgroundColor: '#f0f4f8',
-        padding: '30px'
+        overflowY: 'auto'
+    },
+    backgroundImage: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: 'url("/images/fondo_progreso.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        zIndex: 0
+    },
+    content: {
+        position: 'relative',
+        zIndex: 1,
+        maxWidth: '900px',
+        margin: '0 auto',
+        padding: '20px',
+        backgroundColor: 'rgba(111, 155, 142, 0.44)',
+        borderRadius: '20px',
+        minHeight: '100vh'
+    },
+    backButton: {
+        backgroundColor: '#7d706c',
+        color: '#ffffff',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '20px',
+        cursor: 'pointer',
+        marginBottom: '20px',
+        fontSize: '13px'
+    },
+    header: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+        gap: '10px'
+    },
+    title: {
+        fontSize: '24px',
+        color: '#2c3e50',
+        margin: 0
+    },
+    ageBadge: {
+        backgroundColor: '#3498db',
+        color: 'white',
+        padding: '5px 12px',
+        borderRadius: '20px',
+        fontSize: '13px'
+    },
+    summaryCards: {
+        display: 'flex',
+        gap: '15px',
+        marginBottom: '20px',
+        flexWrap: 'wrap'
+    },
+    summaryCard: {
+        flex: 1,
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        padding: '15px',
+        textAlign: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        minWidth: '100px'
+    },
+    summaryValue: {
+        fontSize: '28px',
+        fontWeight: 'bold',
+        color: '#2c3e50'
+    },
+    summaryLabel: {
+        fontSize: '12px',
+        color: '#7f8c8d'
+    },
+    chartCard: {
+        backgroundColor: '#ffffffeb',
+        borderRadius: '12px',
+        padding: '15px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+    },
+    chartContainer: {
+        height: '280px'
+    },
+    twoColumns: {
+        display: 'flex',
+        gap: '20px',
+        marginBottom: '20px',
+        flexWrap: 'wrap'
+    },
+    successCard: {
+        flex: 1,
+        backgroundColor: '#d4eddaa7',
+        borderRadius: '12px',
+        padding: '15px',
+        borderLeft: '4px solid #27ae60'
+    },
+    dangerCard: {
+        flex: 1,
+        backgroundColor: '#f8d7dac5',
+        borderRadius: '12px',
+        padding: '15px',
+        borderLeft: '4px solid #e74c3c'
+    },
+    fonemaRow: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px 0',
+        borderBottom: '1px solid rgba(0,0,0,0.05)'
+    },
+    scoreGood: {
+        backgroundColor: '#27ae60',
+        color: 'white',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        fontSize: '12px'
+    },
+    scoreBad: {
+        backgroundColor: '#e74c3c',
+        color: 'white',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        fontSize: '12px'
+    },
+    historialCard: {
+        backgroundColor: '#a5bdc98d',
+        borderRadius: '12px',
+        padding: '15px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+    },
+    historialList: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+    },
+    historialItem: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px',
+        backgroundColor: '#fcfffe75',
+        borderRadius: '8px'
+    },
+    puntajeBadge: {
+        padding: '4px 10px',
+        borderRadius: '20px',
+        fontSize: '12px',
+        fontWeight: 'bold'
+    },
+    recomendacionesCard: {
+        backgroundColor: '#e8f4fd',
+        borderRadius: '12px',
+        padding: '15px',
+        marginBottom: '20px'
+    },
+    recomendacionesList: {
+        margin: '0',
+        paddingLeft: '20px',
+        lineHeight: '1.6',
+        fontSize: '13px'
+    },
+    actions: {
+        display: 'flex',
+        gap: '15px',
+        justifyContent: 'center',
+        marginTop: '10px',
+        marginBottom: '20px'
+    },
+    pdfButton: {
+        backgroundColor: '#2c3e50',
+        color: 'white',
+        border: 'none',
+        padding: '10px 20px',
+        borderRadius: '25px',
+        cursor: 'pointer'
+    },
+    closeButton: {
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        padding: '10px 20px',
+        borderRadius: '25px',
+        cursor: 'pointer'
     },
     loadingContainer: {
+        position: 'relative',
+        zIndex: 1,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        color: '#555'
+        backgroundColor: 'rgba(255,255,255,0.9)'
     },
     spinner: {
         border: '4px solid #f3f3f3',
@@ -293,191 +448,11 @@ const styles = {
         animation: 'spin 1s linear infinite',
         marginBottom: '15px'
     },
-    header: {
-        marginBottom: '25px'
-    },
-    backButton: {
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        padding: '10px 20px',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        marginBottom: '20px',
-        fontSize: '14px'
-    },
-    title: {
-        margin: '0 0 10px 0',
-        fontSize: '28px',
-        color: '#2c3e50'
-    },
-    infoBadge: {
-        display: 'flex',
-        gap: '10px',
-        color: '#7f8c8d',
-        fontSize: '14px'
-    },
-    summaryCard: {
-        backgroundColor: 'white',
-        borderRadius: '15px',
-        padding: '20px',
-        display: 'flex',
-        justifyContent: 'space-around',
-        marginBottom: '25px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-    },
-    summaryItem: {
-        textAlign: 'center'
-    },
-    summaryValue: {
-        display: 'block',
-        fontSize: '28px',
-        fontWeight: 'bold',
-        color: '#2c3e50'
-    },
-    summaryLabel: {
-        fontSize: '12px',
-        color: '#7f8c8d'
-    },
-    summaryDivider: {
-        width: '1px',
-        backgroundColor: '#e9ecef'
-    },
-    chartCard: {
-        backgroundColor: 'white',
-        borderRadius: '15px',
-        padding: '20px',
-        marginBottom: '25px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-    },
-    sectionTitle: {
-        margin: '0 0 15px 0',
-        fontSize: '18px',
-        color: '#2c3e50'
-    },
-    chartContainer: {
-        height: '400px'
-    },
-    chartNote: {
-        fontSize: '12px',
-        color: '#7f8c8d',
-        marginTop: '15px',
-        textAlign: 'center'
-    },
-    successCard: {
-        backgroundColor: '#d4edda',
-        borderRadius: '15px',
-        padding: '20px',
-        marginBottom: '25px',
-        borderLeft: '5px solid #28a745'
-    },
-    dangerCard: {
-        backgroundColor: '#f8d7da',
-        borderRadius: '15px',
-        padding: '20px',
-        marginBottom: '25px',
-        borderLeft: '5px solid #dc3545'
-    },
-    fonemasGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '10px'
-    },
-    fonemaCardSuccess: {
-        backgroundColor: 'white',
-        padding: '10px 15px',
-        borderRadius: '8px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderLeft: '3px solid #28a745'
-    },
-    fonemaCardDanger: {
-        backgroundColor: 'white',
-        padding: '10px 15px',
-        borderRadius: '8px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderLeft: '3px solid #dc3545'
-    },
-    fonemaNombre: {
-        fontSize: '14px',
-        fontWeight: 'bold',
-        color: '#2c3e50'
-    },
-    fonemaScore: {
-        fontSize: '14px',
-        fontWeight: 'bold',
-        padding: '4px 10px',
-        borderRadius: '20px',
-        backgroundColor: '#f8f9fa'
-    },
-    historialCard: {
-        backgroundColor: 'white',
-        borderRadius: '15px',
-        padding: '20px',
-        marginBottom: '25px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-    },
-    tableContainer: {
-        overflowX: 'auto'
-    },
-    table: {
-        width: '100%',
-        borderCollapse: 'collapse'
-    },
-    puntajeBadge: {
-        padding: '4px 10px',
-        borderRadius: '20px',
-        fontSize: '12px',
-        fontWeight: 'bold'
-    },
-    recomendacionesCard: {
-        backgroundColor: '#e8f4fd',
-        borderRadius: '15px',
-        padding: '20px',
-        marginBottom: '25px'
-    },
-    recomendacionesList: {
-        margin: '0',
-        paddingLeft: '20px',
-        lineHeight: '1.8'
-    },
-    actions: {
-        display: 'flex',
-        gap: '15px',
-        justifyContent: 'center',
-        marginTop: '20px',
-        flexWrap: 'wrap'
-    },
-    pdfButton: {
-        backgroundColor: '#2c3e50',
-        color: 'white',
-        border: 'none',
-        padding: '12px 25px',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: 'bold'
-    },
-    backButtonFooter: {
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        padding: '12px 25px',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: 'bold'
-    },
     errorCard: {
         textAlign: 'center',
-        padding: '50px',
+        padding: '40px',
         backgroundColor: 'white',
-        borderRadius: '15px'
-    },
-    errorText: {
-        color: '#e74c3c',
-        marginBottom: '20px'
+        borderRadius: '12px'
     }
 };
 

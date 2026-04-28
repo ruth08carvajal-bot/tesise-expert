@@ -194,7 +194,7 @@ const styles = {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundImage: 'url("/images/fondo2.png")',
+        backgroundImage: 'url("/images/fondo_chat.png")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         zIndex: 0
