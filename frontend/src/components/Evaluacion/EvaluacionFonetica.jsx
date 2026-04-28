@@ -1,8 +1,9 @@
+// components/Evaluacion/EvaluacionFonetica.jsx
 import React, { useState, useEffect } from 'react';
-import { obtenerPlan, enviarAudioEvaluacion, enviarValorFuzzy } from '../../api/evaluacionService';
+import { obtenerPlan, enviarAudioEvaluacion, enviarValorFuzzy, obtenerResultadosDiagnostico, generarReportePDF, obtenerDatosEvaluacion } from '../../api/evaluacionService';
 
 // =========================================================
-// RECURSOS Y CONFIGURACIÓN DE EJERCICIOS
+// RECURSOS Y CONFIGURACIÓN DE EJERCICIOS (TU DISEÑO ORIGINAL)
 // =========================================================
 
 const recursosEjercicios = {
@@ -83,6 +84,7 @@ const recursosEjercicios = {
     // === EJERCICIOS DE SELECCIÓN DE IMÁGENES ===
     "Emociones": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "feliz", imagen: "/images/emociones/feliz.png", texto: "Feliz", correcta: true, valor: 1.0 },
             { id: "triste", imagen: "/images/emociones/triste.png", texto: "Triste", correcta: false, valor: 0.0 },
@@ -96,6 +98,7 @@ const recursosEjercicios = {
     },
     "Absurdos Visuales": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "sol_llorando", imagen: "/images/absurdos/sol_llorando.png", texto: "El sol está llorando", correcta: true, valor: 1.0 },
             { id: "sol_normal", imagen: "/images/absurdos/sol_normal.png", texto: "El sol normal", correcta: false, valor: 0.0 }
@@ -107,6 +110,7 @@ const recursosEjercicios = {
     },
     "Categorización": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "manzana", imagen: "/images/categorias/manzana.png", texto: "Manzana", correcta: false, valor: 0.0 },
             { id: "perro", imagen: "/images/categorias/perro.png", texto: "Perro", correcta: true, valor: 1.0 },
@@ -120,6 +124,7 @@ const recursosEjercicios = {
     },
     "Opuestos": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "grande", imagen: "/images/opuestos/grande.png", texto: "Grande", correcta: false, valor: 0.0 },
             { id: "pequeno", imagen: "/images/opuestos/pequeno.png", texto: "Pequeño", correcta: true, valor: 1.0 }
@@ -131,6 +136,7 @@ const recursosEjercicios = {
     },
     "Orientación Letras": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "b", imagen: "/images/letras/b.png", texto: "Letra B", correcta: false, valor: 0.0 },
             { id: "d", imagen: "/images/letras/d.png", texto: "Letra D", correcta: true, valor: 1.0 }
@@ -142,6 +148,7 @@ const recursosEjercicios = {
     },
     "Completar Frase": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "come", imagen: "/images/frases/come.png", texto: "come", correcta: true, valor: 1.0 },
             { id: "duerme", imagen: "/images/frases/duerme.png", texto: "duerme", correcta: false, valor: 0.0 },
@@ -154,6 +161,7 @@ const recursosEjercicios = {
     },
     "Reglas Ortográficas": {
         tipo: "seleccion_fuzzy",
+        mostrarMediaPrincipal: false,
         imagenes: [
             { id: "volar", imagen: "/images/ortografia/volar.png", texto: "Volar", correcta: true, valor: 1.0 },
             { id: "bolar", imagen: "/images/ortografia/bolar.png", texto: "Bolar", correcta: false, valor: 0.0 }
@@ -176,6 +184,10 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
     const [mostrarAyuda, setMostrarAyuda] = useState(false);
     const [seleccionImagen, setSeleccionImagen] = useState(null);
     const [mostrarSliderEvaluacion, setMostrarSliderEvaluacion] = useState(false);
+    const [finalizando, setFinalizando] = useState(false);
+    const [generandoPDF, setGenerandoPDF] = useState(false);
+    const [evaluacionFinalizada, setEvaluacionFinalizada] = useState(false);
+    const [resultadosDiagnostico, setResultadosDiagnostico] = useState(null);
 
     useEffect(() => {
         const cargarDatos = async () => {
@@ -280,6 +292,101 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
         enviarCalificacionFuzzy(imagen.valor);
     };
 
+    // =========================================================
+    // FUNCIÓN PARA FINALIZAR Y VER DIAGNÓSTICO
+    // =========================================================
+    const ejecutarDiagnosticoYFinalizar = async () => {
+        setFinalizando(true);
+        try {
+            console.log("Ejecutando diagnóstico...");
+            
+            const resultados = await obtenerResultadosDiagnostico(idNino, idEvaluacion);
+            
+            console.log("Diagnóstico completado:", resultados);
+            
+            setResultadosDiagnostico(resultados);
+            setEvaluacionFinalizada(true);
+            
+            // Mostrar resumen al tutor
+            if (resultados.diagnosticos && resultados.diagnosticos.length > 0) {
+                const diagnosticosFuertes = resultados.diagnosticos.filter(d => d.fc_total > 0.5);
+                let mensaje = "📊 RESULTADOS DE LA EVALUACIÓN\n\n";
+                if (diagnosticosFuertes.length > 0) {
+                    mensaje += "🔍 DIAGNÓSTICOS DETECTADOS:\n";
+                    diagnosticosFuertes.forEach(d => {
+                        mensaje += `  • ${d.nombre_diag} (${(d.fc_total * 100).toFixed(1)}% certeza)\n`;
+                    });
+                    mensaje += "\n📋 Revise el informe completo para más detalles.";
+                } else {
+                    mensaje += "✅ No se detectaron alteraciones significativas.\n\nSe recomienda seguimiento en 6 meses.";
+                }
+                alert(mensaje);
+            }
+            
+        } catch (error) {
+            console.error("Error al ejecutar diagnóstico:", error);
+            alert("Error al generar el diagnóstico. Por favor intenta nuevamente.");
+        } finally {
+            setFinalizando(false);
+        }
+    };
+
+    // =========================================================
+    // FUNCIÓN PARA GENERAR PDF
+    // =========================================================
+    const handleGenerarPDF = async () => {
+        setGenerandoPDF(true);
+        try {
+            const datosEvaluacion = await obtenerDatosEvaluacion(idNino, idEvaluacion);
+            
+            if (datosEvaluacion.status === 'success') {
+                const response = await fetch('http://127.0.0.1:8003/evaluacion/generar-reporte-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id_nino: idNino,
+                        id_evaluacion: idEvaluacion,
+                        datos: datosEvaluacion
+                    })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `informe_evaluacion_${idNino}_${idEvaluacion}.pdf`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                    alert("✅ PDF generado exitosamente");
+                } else {
+                    throw new Error('Error al generar PDF');
+                }
+            }
+        } catch (error) {
+            console.error("Error generando PDF:", error);
+            alert("Error al generar el PDF. Por favor intenta nuevamente.");
+        } finally {
+            setGenerandoPDF(false);
+        }
+    };
+
+    // =========================================================
+    // FUNCIÓN PARA SALIR Y VOLVER
+    // =========================================================
+    const handleSalir = () => {
+        if (onFinish) {
+            onFinish(resultadosDiagnostico);
+        }
+    };
+
+    // =========================================================
+    // FUNCIÓN MANEJAR SIGUIENTE
+    // =========================================================
     const manejarSiguiente = () => {
         if (indiceActual + 1 < ejercicios.length) {
             setIndiceActual(indiceActual + 1);
@@ -288,12 +395,65 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
             setMostrarAyuda(false);
             setSeleccionImagen(null);
             setMostrarSliderEvaluacion(false);
-        } else { 
-            onFinish(); 
+        } else {
+            ejecutarDiagnosticoYFinalizar();
         }
     };
 
     const progreso = ((indiceActual + 1) / ejercicios.length) * 100;
+
+    // =========================================================
+    // PANTALLA DE RESULTADOS FINALES
+    // =========================================================
+    if (evaluacionFinalizada) {
+        return (
+            <div style={styles.container}>
+                <div style={styles.card}>
+                    <div style={styles.cardHeader}>
+                        <h2 style={styles.title}>✅ Evaluación Completada</h2>
+                    </div>
+                    
+                    <div style={styles.resultadosFinales}>
+                        <p style={styles.mensajeFinal}>
+                            La evaluación ha sido completada exitosamente.
+                        </p>
+                        
+                        {resultadosDiagnostico && resultadosDiagnostico.diagnosticos && (
+                            <div style={styles.diagnosticosResumen}>
+                                <h3>📊 Diagnósticos Detectados</h3>
+                                {resultadosDiagnostico.diagnosticos
+                                    .filter(d => d.fc_total > 0.5)
+                                    .map((d, idx) => (
+                                        <p key={idx} style={styles.diagnosticoItem}>
+                                            • {d.nombre_diag} ({(d.fc_total * 100).toFixed(1)}% certeza)
+                                        </p>
+                                    ))}
+                                {resultadosDiagnostico.diagnosticos.filter(d => d.fc_total > 0.5).length === 0 && (
+                                    <p>✅ No se detectaron alteraciones significativas</p>
+                                )}
+                            </div>
+                        )}
+                        
+                        <div style={styles.botonesResultados}>
+                            <button 
+                                onClick={handleGenerarPDF} 
+                                style={styles.botonPDF}
+                                disabled={generandoPDF}
+                            >
+                                {generandoPDF ? '⏳ Generando...' : '📄 Descargar Informe PDF'}
+                            </button>
+                            <button 
+                                onClick={handleSalir} 
+                                style={styles.botonSalir}
+                            >
+                                🏠 Salir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (error) {
         return (
@@ -322,15 +482,19 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
         tipo: "fuzzy",
         imagen: "/images/ejercicios/default.png",
         video: null,
-        instruccion: ejercicioActual.descripcion_instrucciones,
-        ejemplo: ejercicioActual.descripcion_instrucciones,
+        instruccion: ejercicioActual.descripcion_instrucciones || "Realiza el ejercicio",
+        ejemplo: ejercicioActual.descripcion_instrucciones || "Sigue las instrucciones",
         consejo: "¡Tú puedes!",
-        preguntaEvaluacion: "¿Cómo evaluarías este ejercicio?"
+        preguntaEvaluacion: "¿Cómo evaluarías este ejercicio?",
+        mostrarMediaPrincipal: true
     };
 
     const tipoEjercicio = recurso.tipo || (ejercicioActual.tipo_apoyo === 'MFCC' ? 'mfcc' : 'fuzzy');
+    
+    const mostrarMediaPrincipal = recurso.mostrarMediaPrincipal !== false && 
+                                   tipoEjercicio !== 'seleccion_fuzzy' && 
+                                   tipoEjercicio !== 'video_fuzzy';
 
-    // Renderizar según tipo de ejercicio
     const renderizarContenido = () => {
         switch (tipoEjercicio) {
             case 'mfcc':
@@ -402,7 +566,7 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
                     </div>
                 );
 
-            default: // fuzzy con slider mejorado
+            default:
                 return renderizarSliderFuzzy();
         }
     };
@@ -471,26 +635,16 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
                     </button>
                 </div>
 
-                {/* Imagen o video de demostración */}
-                {(recurso.imagen || recurso.video) && tipoEjercicio !== 'seleccion_fuzzy' && (
+                {mostrarMediaPrincipal && recurso.imagen && (
                     <div style={styles.mediaContainer}>
-                        {recurso.video ? (
-                            <video 
-                                src={recurso.video} 
-                                style={styles.media}
-                                controls
-                                poster={recurso.imagen}
-                            />
-                        ) : (
-                            <img 
-                                src={recurso.imagen} 
-                                alt={ejercicioActual.nombre_ejercicio}
-                                style={styles.media}
-                                onError={(e) => {
-                                    e.target.src = "/images/ejercicios/default.png";
-                                }}
-                            />
-                        )}
+                        <img 
+                            src={recurso.imagen} 
+                            alt={ejercicioActual.nombre_ejercicio}
+                            style={styles.media}
+                            onError={(e) => {
+                                e.target.src = "/images/ejercicios/default.png";
+                            }}
+                        />
                     </div>
                 )}
 
@@ -503,12 +657,10 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
                     </div>
                 )}
                 
-                {/* Área interactiva según tipo */}
                 <div style={styles.practiceArea}>
                     {renderizarContenido()}
                 </div>
 
-                {/* Resultado */}
                 {resultado && (
                     <div style={styles.resultContainer}>
                         <div style={styles.resultBadge(resultado.similitud_detectada)}>
@@ -520,8 +672,13 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
                              resultado.similitud_detectada >= 0.4 ? '¡Buen intento! Sigue practicando.' :
                              '¡No te rindas! Cada intento cuenta.'}
                         </p>
-                        <button onClick={manejarSiguiente} style={styles.nextButton}>
-                            {indiceActual + 1 === ejercicios.length ? '🏆 Finalizar' : '➡ Siguiente'}
+                        <button 
+                            onClick={manejarSiguiente} 
+                            style={styles.nextButton}
+                            disabled={finalizando}
+                        >
+                            {finalizando ? '⏳ Generando diagnóstico...' : 
+                             (indiceActual + 1 === ejercicios.length ? '🏆 Ver Diagnóstico' : '➡ Siguiente')}
                         </button>
                     </div>
                 )}
@@ -529,6 +686,10 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
         </div>
     );
 };
+
+// =========================================================
+// ESTILOS (TU DISEÑO ORIGINAL CON AGREGADOS)
+// =========================================================
 
 const styles = {
     container: {
@@ -807,6 +968,52 @@ const styles = {
         padding: '12px 25px',
         borderRadius: '25px',
         cursor: 'pointer',
+        fontWeight: 'bold'
+    },
+    resultadosFinales: {
+        textAlign: 'center',
+        padding: '20px'
+    },
+    mensajeFinal: {
+        fontSize: '16px',
+        marginBottom: '20px',
+        color: '#2c3e50'
+    },
+    diagnosticosResumen: {
+        backgroundColor: '#f8f9fa',
+        borderRadius: '15px',
+        padding: '15px',
+        marginBottom: '20px',
+        textAlign: 'left'
+    },
+    diagnosticoItem: {
+        margin: '8px 0',
+        fontSize: '14px'
+    },
+    botonesResultados: {
+        display: 'flex',
+        gap: '15px',
+        justifyContent: 'center',
+        marginTop: '20px'
+    },
+    botonPDF: {
+        backgroundColor: '#e74c3c',
+        color: 'white',
+        border: 'none',
+        padding: '12px 24px',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '16px',
+        fontWeight: 'bold'
+    },
+    botonSalir: {
+        backgroundColor: '#3498db',
+        color: 'white',
+        border: 'none',
+        padding: '12px 24px',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontSize: '16px',
         fontWeight: 'bold'
     },
     errorContainer: {
