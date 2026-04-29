@@ -140,6 +140,14 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
     const esTipoSeleccion = ejercicio.tipo_apoyo === 'Selección';
     const esTipoFuzzy = ejercicio.tipo_apoyo === 'Fuzzy-Padre';
 
+    const opcionesDeSeleccion = ejercicio.opciones || [
+        { id: 'A', texto: 'Opción A', correcta: true },
+        { id: 'B', texto: 'Opción B', correcta: false },
+        { id: 'C', texto: 'Opción C', correcta: false }
+    ];
+
+    const imagenEjercicio = ejercicio.imagen || ejercicio.imagen_recurso;
+
     return (
         <div style={styles.container}>
             <button style={styles.backButton} onClick={onVolver}>
@@ -147,12 +155,33 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
             </button>
 
             <div style={styles.card}>
-                <h2 style={styles.title}>{ejercicio.nombre}</h2>
-                <p style={styles.description}>{ejercicio.descripcion}</p>
-                
+                <div style={styles.headerCard}>
+                    <div style={styles.headerText}>
+                        <h2 style={styles.title}>{ejercicio.nombre}</h2>
+                        <p style={styles.description}>{ejercicio.descripcion}</p>
+                    </div>
+                    <div style={styles.gameBadgeRow}>
+                        <span style={styles.badge}>{ejercicio.tipo_apoyo || 'Actividad'}</span>
+                        <span style={styles.badgeSecondary}>{ejercicio.nivel || 'Nivel Básico'}</span>
+                    </div>
+                </div>
+
+                {imagenEjercicio ? (
+                    <div style={styles.imageWrapper}>
+                        <img src={imagenEjercicio} alt={ejercicio.nombre} style={styles.exerciseImage} />
+                    </div>
+                ) : (
+                    <div style={styles.imageWrapperPlaceholder}>
+                        <span style={styles.placeholderLabel}>Imagen del juego</span>
+                    </div>
+                )}
+
                 {/* TIPO MFCC: Grabación de voz */}
                 {esTipoMFCC && (
                     <div style={styles.practiceArea}>
+                        <p style={styles.instructions}>
+                            Habla con claridad la palabra indicada y luego presiona detener para evaluar tu pronunciación.
+                        </p>
                         {!grabando ? (
                             <button style={styles.recordButton} onClick={iniciarGrabacion}>
                                 🎤 Iniciar Práctica
@@ -162,28 +191,29 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
                                 🛑 Detener y Evaluar
                             </button>
                         )}
+                        {grabando && <p style={styles.recordingText}>Grabando... ¡Habla ahora! 🎧</p>}
                     </div>
                 )}
 
-                {/* TIPO SELECCIÓN: Opción múltiple (ejemplo) */}
+                {/* TIPO SELECCIÓN: Opción múltiple */}
                 {esTipoSeleccion && (
                     <div style={styles.practiceArea}>
                         <p style={styles.preguntaSeleccion}>
-                            {ejercicio.id_hecho_objetivo === 137 && "¿Qué animal hace este sonido? 'Miau'"}
-                            {ejercicio.id_hecho_objetivo === 135 && "Mira la imagen: El sol está llorando. ¿Qué está mal?"}
-                            {ejercicio.id_hecho_objetivo === 77 && "Manzana, Perro, Plátano, Uva: ¿Cuál no pertenece?"}
-                            {(!ejercicio.id_hecho_objetivo || ejercicio.id_hecho_objetivo === 0) && "Selecciona la respuesta correcta"}
+                            {ejercicio.pregunta || 'Selecciona la respuesta correcta:'}
                         </p>
                         <div style={styles.opcionesContainer}>
-                            <button style={styles.opcionButton} onClick={() => manejarSeleccion('A', true)}>
-                                Opción A
-                            </button>
-                            <button style={styles.opcionButton} onClick={() => manejarSeleccion('B', false)}>
-                                Opción B
-                            </button>
-                            <button style={styles.opcionButton} onClick={() => manejarSeleccion('C', false)}>
-                                Opción C
-                            </button>
+                            {opcionesDeSeleccion.map((opcion) => (
+                                <button
+                                    key={opcion.id}
+                                    style={{
+                                        ...styles.opcionButton,
+                                        ...(opcionSeleccionada === opcion.id ? styles.opcionButtonActive : {})
+                                    }}
+                                    onClick={() => manejarSeleccion(opcion.id, opcion.correcta)}
+                                >
+                                    {opcion.texto}
+                                </button>
+                            ))}
                         </div>
                         {opcionSeleccionada && (
                             <p style={styles.seleccionInfo}>Seleccionaste: {opcionSeleccionada}</p>
@@ -191,14 +221,14 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
                     </div>
                 )}
 
-                {/* TIPO FUZZY: Auto-evaluación del niño (próximamente) */}
+                {/* TIPO FUZZY: Auto-evaluación del niño */}
                 {esTipoFuzzy && (
                     <div style={styles.practiceArea}>
                         <p style={styles.infoFuzzy}>
-                            Practica este ejercicio y pregúntale a tu tutor cómo lo hiciste.
+                            Practica este ejercicio mientras revisas la imagen y luego marca si lo completaste.
                         </p>
                         <button style={styles.simularButton} onClick={() => manejarSeleccion('Practica', true)}>
-                            ✅ Marcar como practicado
+                            ✅ Marcar como completado
                         </button>
                     </div>
                 )}
@@ -207,8 +237,8 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
                 {resultado !== null && (
                     <div style={styles.resultContainer}>
                         <div style={styles.resultBadge(resultado)}>
-                            {resultado >= 0.7 ? '✅' : resultado >= 0.4 ? '📈' : '🔄'} 
-                            {Math.round(resultado * 100)}%
+                            {resultado >= 0.7 ? '✅' : resultado >= 0.4 ? '📈' : '🔄'}
+                            {' '}{Math.round(resultado * 100)}%
                         </div>
                         <p style={styles.feedback}>{obtenerMensajeFeedback(resultado)}</p>
                         <button style={styles.tryAgainButton} onClick={() => {
@@ -241,25 +271,96 @@ const styles = {
     },
     card: {
         backgroundColor: 'white',
-        borderRadius: '20px',
-        padding: '40px',
-        maxWidth: '600px',
+        borderRadius: '24px',
+        padding: '36px',
+        maxWidth: '720px',
         margin: '0 auto',
         textAlign: 'center',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+        boxShadow: '0 18px 40px rgba(0,0,0,0.08)'
     },
-    title: {
+    headerCard: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '20px',
+        marginBottom: '24px',
+        flexWrap: 'wrap'
+    },
+    headerText: {
+        textAlign: 'left',
+        flex: 1,
+        minWidth: '220px'
+    },
+    gameBadgeRow: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        alignItems: 'flex-end'
+    },
+    badge: {
+        backgroundColor: '#27ae60',
+        color: 'white',
+        padding: '8px 16px',
+        borderRadius: '999px',
+        fontSize: '12px',
+        fontWeight: '700'
+    },
+    badgeSecondary: {
+        backgroundColor: '#ecf0f1',
         color: '#2c3e50',
-        marginBottom: '15px'
+        padding: '8px 16px',
+        borderRadius: '999px',
+        fontSize: '12px',
+        fontWeight: '700'
     },
     description: {
         color: '#555',
         fontSize: '16px',
-        lineHeight: '1.6',
-        marginBottom: '30px'
+        lineHeight: '1.7',
+        marginBottom: '0'
+    },
+    imageWrapper: {
+        marginTop: '24px',
+        marginBottom: '24px',
+        borderRadius: '24px',
+        overflow: 'hidden',
+        boxShadow: '0 16px 30px rgba(0,0,0,0.08)'
+    },
+    imageWrapperPlaceholder: {
+        marginTop: '24px',
+        marginBottom: '24px',
+        borderRadius: '24px',
+        minHeight: '240px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f5f7fa',
+        boxShadow: '0 12px 24px rgba(0,0,0,0.05)'
+    },
+    exerciseImage: {
+        width: '100%',
+        height: 'auto',
+        display: 'block'
+    },
+    placeholderLabel: {
+        color: '#95a5a6',
+        fontSize: '16px'
     },
     practiceArea: {
         margin: '30px 0'
+    },
+    instructions: {
+        fontSize: '15px',
+        color: '#4b6584',
+        marginBottom: '20px',
+        maxWidth: '650px',
+        marginLeft: 'auto',
+        marginRight: 'auto'
+    },
+    recordingText: {
+        marginTop: '16px',
+        color: '#e74c3c',
+        fontWeight: '700'
     },
     recordButton: {
         backgroundColor: '#27ae60',
@@ -286,6 +387,21 @@ const styles = {
         marginBottom: '20px',
         color: '#2c3e50'
     },
+    stopButton: {
+        backgroundColor: '#e74c3c',
+        color: 'white',
+        border: 'none',
+        padding: '15px 30px',
+        borderRadius: '50px',
+        fontSize: '18px',
+        cursor: 'pointer',
+        fontWeight: 'bold'
+    },
+    preguntaSeleccion: {
+        fontSize: '18px',
+        marginBottom: '20px',
+        color: '#2c3e50'
+    },
     opcionesContainer: {
         display: 'flex',
         gap: '15px',
@@ -296,10 +412,15 @@ const styles = {
         backgroundColor: '#3498db',
         color: 'white',
         border: 'none',
-        padding: '12px 25px',
-        borderRadius: '10px',
+        padding: '14px 26px',
+        borderRadius: '14px',
         cursor: 'pointer',
-        fontSize: '16px'
+        fontSize: '16px',
+        minWidth: '160px',
+        transition: 'transform 0.18s ease, background-color 0.18s ease'
+    },
+    opcionButtonActive: {
+        backgroundColor: '#2c3e50'
     },
     seleccionInfo: {
         marginTop: '15px',
