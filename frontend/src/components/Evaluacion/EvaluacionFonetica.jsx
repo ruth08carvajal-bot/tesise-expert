@@ -334,7 +334,7 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
     // =========================================================
     // FUNCIÓN PARA GENERAR PDF
     // =========================================================
-    const handleGenerarPDF = async () => {
+    /*const handleGenerarPDF = async () => {
         setGenerandoPDF(true);
         try {
             const datosEvaluacion = await obtenerDatosEvaluacion(idNino, idEvaluacion);
@@ -373,7 +373,41 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
         } finally {
             setGenerandoPDF(false);
         }
+    };*/
+    //inicio 28-06-2024 CAMBIO PARA USAR GET EN LUGAR DE POST PARA GENERAR PDF
+    const handleGenerarPDF = async () => {
+        setGenerandoPDF(true);
+        try {
+            // CAMBIO 1: Usar GET con los IDs en la URL
+            const response = await fetch(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${idEvaluacion}`, {
+                method: 'GET',  // CAMBIO 2: GET en lugar de POST
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `informe_evaluacion_${idNino}_${idEvaluacion}.pdf`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+                alert("✅ PDF generado exitosamente");
+            } else {
+                throw new Error('Error al generar PDF');
+            }
+        } catch (error) {
+            console.error("Error generando PDF:", error);
+            alert("Error al generar el PDF. Por favor intenta nuevamente.");
+        } finally {
+            setGenerandoPDF(false);
+        }
     };
+    //fin 28-06-2024 CAMBIO PARA USAR GET EN LUGAR DE POST PARA GENERAR PDF
 
     // =========================================================
     // FUNCIÓN PARA SALIR Y VOLVER

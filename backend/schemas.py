@@ -12,9 +12,12 @@ class LoginSchema(BaseModel):
         return v
 
 class NinoSchema(BaseModel):
+    id_tut: int = Field(..., gt=0)
     nombre: str = Field(..., min_length=1, max_length=100)
     f_nac: str  # Date in YYYY-MM-DD format
-    id_tut: int = Field(..., gt=0)
+    genero: str = Field(..., min_length=1, max_length=1)  # M o F
+    escolaridad: str = Field(..., min_length=1)
+    parentesco: str = Field(..., min_length=1)
 
 class AnamnesisSchema(BaseModel):
     id_nino: int = Field(..., gt=0)
