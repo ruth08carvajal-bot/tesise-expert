@@ -14,6 +14,11 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
         setError('');
         setCargando(true);
 
+        console.log("=== DATOS A ENVIAR ===");
+        console.log("Username:", username);
+        console.log("Password:", password);
+        console.log("Rol seleccionado:", rolSeleccionado);
+
         if (!username || !password) {
             setError("Por favor, complete todos los campos");
             setCargando(false);
@@ -21,7 +26,10 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
         }
 
         try {
+            console.log("Enviando petición a:", "http://localhost:8003/auth/login");
             const data = await login(username, password);
+            console.log("Respuesta recibida:", data);
+            
             if (data.status === "success") {
                 localStorage.setItem('user', JSON.stringify(data.usuario));
                 onLoginSuccess(data.usuario);
@@ -29,7 +37,10 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
                 setError("Credenciales incorrectas");
             }
         } catch (err) {
-            setError("Error de conexión con el servidor");
+            console.error("ERROR COMPLETO:", err);
+            console.error("Response:", err.response);
+            console.error("Response data:", err.response?.data);
+            setError(err.response?.data?.detail || "Error de conexión con el servidor");
         } finally {
             setCargando(false);
         }
@@ -37,18 +48,14 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
 
     return (
         <div style={styles.container}>
-            {/* Fondo con tu imagen */}
             <div style={styles.background}>
-                {/* Tarjeta de login a la derecha */}
                 <div style={styles.cardContainer}>
                     <div style={styles.card}>
-                        {/* Título */}
                         <div style={styles.header}>
                             <h1 style={styles.title}>Las Voces del Illimani</h1>
                             <p style={styles.subtitle}>Sistema Experto Fonoaudiológico</p>
                         </div>
 
-                        {/* Selector de rol */}
                         <div style={styles.selectorRol}>
                             <button
                                 onClick={() => setRolSeleccionado('padres')}
@@ -70,7 +77,6 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
                             </button>
                         </div>
 
-                        {/* Formulario */}
                         <form onSubmit={handleSubmit} style={styles.form}>
                             <div style={styles.inputGroup}>
                                 <label style={styles.label}>Usuario</label>
@@ -145,27 +151,27 @@ const styles = {
     background: {
         width: '100%',
         minHeight: '100vh',
-        backgroundImage: 'url("/images/fondo.png")', // ← TU IMAGEN DE FONDO
+        backgroundImage: 'url("/images/fondo.png")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         position: 'relative',
         display: 'flex',
-        justifyContent: 'flex-end', // Tarjeta a la derecha
+        justifyContent: 'flex-end',
         alignItems: 'center'
     },
     cardContainer: {
         width: '100%',
         maxWidth: '440px',
-        marginRight: '8%', // Separación desde la derecha
+        marginRight: '8%',
         padding: '20px'
     },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.70)', // Blanco con 70% opacidad
+        backgroundColor: 'rgba(255, 255, 255, 0.70)',
         borderRadius: '20px',
         padding: '35px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-        backdropFilter: 'blur(2px)' // Pequeño desenfoque para integrarse con el fondo
+        backdropFilter: 'blur(2px)'
     },
     header: {
         textAlign: 'center',
