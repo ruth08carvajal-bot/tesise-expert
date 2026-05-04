@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { registrarNino, obtenerNinos } from '../api/ninosService';
+import { registrarNino, obtenerNinos, obtenerDatosNino, actualizarNino } from '../api/ninosService';
 import AnamnesisForm from './AnamnesisForm';
 import EvaluacionFonetica from '../components/Evaluacion/EvaluacionFonetica';
 import ResultadosDiagnostico from '../components/Evaluacion/ResultadosDiagnostico';
@@ -12,6 +12,8 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso, onIniciarEvaluacion 
         nombre: '', f_nac: '', genero: 'M', escolaridad: 'Inicial', parentesco: 'Padre/Madre'
     });
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '', mostrar: false });
+    const [datosNino, setDatosNino] = useState(null);
+    const [showDatos, setShowDatos] = useState(false);
     const [showAnamnesis, setShowAnamnesis] = useState(false);
     const [selectedNino, setSelectedNino] = useState(null);
     const [showEvaluacion, setShowEvaluacion] = useState(false);
@@ -73,18 +75,58 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso, onIniciarEvaluacion 
         }
         
         try {
-            await registrarNino({ ...nuevoNino, id_tut: usuario.id_tut });
+            const response = await registrarNino({ ...nuevoNino, id_tut: usuario.id_tut });
             setNuevoNino({ nombre: '', f_nac: '', genero: 'M', escolaridad: 'Inicial', parentesco: 'Padre/Madre' });
-            setMensaje({ texto: "Niño registrado exitosamente", tipo: 'success', mostrar: true });
+            setMensaje({ 
+                texto: `Niño registrado exitosamente. Usuario: ${response.username}, Contraseña: ${response.password}`, 
+                tipo: 'success', 
+                mostrar: true 
+            });
             setMostrarFormulario(false);
             cargarNinos();
-            setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 3000);
+            setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 5000);
         } catch (err) { 
             console.error("Error al registrar niño", err);
             setMensaje({ texto: "Error al registrar el niño", tipo: 'error', mostrar: true });
             setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 3000);
         }
     };
+
+    const handleVerDatos = async (id_nino) => {
+        try {
+            const data = await obtenerDatosNino(id_nino);
+            setDatosNino(data);
+            setShowDatos(true);
+        } catch (err) {
+            console.error("Error al obtener datos del niño", err);
+            setMensaje({ texto: "Error al obtener datos del niño", tipo: 'error', mostrar: true });
+            setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 3000);
+        }
+    };
+
+    const handleGuardarDatos = async () => {
+        try {
+            // Filtrar solo los campos necesarios para la actualización
+            const datosActualizar = {
+                nombre: datosNino.nombre,
+                f_nac: datosNino.f_nac,
+                genero: datosNino.genero,
+                escolaridad: datosNino.escolaridad,
+                parentesco: datosNino.parentesco
+            };
+            await actualizarNino(datosNino.id_nino, datosActualizar);
+            setMensaje({ texto: "Datos del niño actualizados exitosamente", tipo: 'success', mostrar: true });
+            setShowDatos(false);
+            setDatosNino(null);
+            cargarNinos();
+            setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 3000);
+        } catch (err) {
+            console.error("Error al actualizar datos del niño", err);
+            setMensaje({ texto: "Error al actualizar datos del niño", tipo: 'error', mostrar: true });
+            setTimeout(() => setMensaje({ texto: '', tipo: '', mostrar: false }), 3000);
+        }
+    };
+
 
     const handleAnamnesis = (id_nino) => {
         const nino = ninos.find(n => String(n.id_nino) === String(id_nino));
@@ -278,6 +320,16 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso, onIniciarEvaluacion 
                 </div>
             )}
 
+            {/* Modal de datos del niño */}
+            {showDatos && (
+                <ModalDatosNino 
+                    datosNino={datosNino} 
+                    onClose={() => { setShowDatos(false); setDatosNino(null); }}
+                    onSave={handleGuardarDatos}
+                    onChange={setDatosNino}
+                />
+            )}
+
             {/* Contenido principal */}
             <div style={styles.content}>
                 {/* Barra superior */}
@@ -357,6 +409,7 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso, onIniciarEvaluacion 
                                     )}
                                     
                                     <div style={styles.buttonGroup}>
+                                        <button style={styles.btnDatos} onClick={() => handleVerDatos(nino.id_nino)}>👤 Ver Datos</button>
                                         {!nino.anamnesis_completa ? (
                                             <button style={styles.btnWarning} onClick={() => handleAnamnesis(nino.id_nino)}>📋 Anamnesis</button>
                                         ) : (
@@ -621,6 +674,15 @@ const styles = {
         cursor: 'pointer',
         fontSize: '11px'
     },
+    btnDatos: {
+        backgroundColor: '#9b59b6',
+        color: 'white',
+        border: 'none',
+        padding: '5px 10px',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontSize: '11px'
+    },
     btnDisabled: {
         backgroundColor: '#95a5a6',
         color: 'white',
@@ -789,7 +851,155 @@ const styles = {
         justifyContent: 'center',
         alignItems: 'center',
         padding: '20px'
+    },
+    modalDatosOverlay: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1500
+    },
+    modalDatosContainer: {
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        width: '90%',
+        maxWidth: '500px',
+        maxHeight: '80vh',
+        overflow: 'hidden',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+    },
+    modalDatosHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px',
+        borderBottom: '1px solid #ddd',
+        backgroundColor: '#f8f9fa'
+    },
+    modalDatosBody: {
+        padding: '20px',
+        maxHeight: '400px',
+        overflowY: 'auto'
+    },
+    modalDatosFooter: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '10px',
+        padding: '20px',
+        borderTop: '1px solid #ddd',
+        backgroundColor: '#f8f9fa'
+    },
+    datosForm: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '15px'
+    },
+    closeButton: {
+        background: 'none',
+        border: 'none',
+        fontSize: '20px',
+        cursor: 'pointer',
+        color: '#666'
+    },
+    cancelButton: {
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        padding: '10px 20px',
+        borderRadius: '6px',
+        cursor: 'pointer'
+    },
+    saveButton: {
+        backgroundColor: '#28a745',
+        color: 'white',
+        border: 'none',
+        padding: '10px 20px',
+        borderRadius: '6px',
+        cursor: 'pointer'
     }
+};
+
+// Modal para ver/editar datos del niño
+const ModalDatosNino = ({ datosNino, onClose, onSave, onChange }) => {
+    if (!datosNino) return null;
+
+    return (
+        <div style={styles.modalDatosOverlay} onClick={onClose}>
+            <div style={styles.modalDatosContainer} onClick={(e) => e.stopPropagation()}>
+                <div style={styles.modalDatosHeader}>
+                    <h3>Datos del Niño</h3>
+                    <button style={styles.closeButton} onClick={onClose}>✕</button>
+                </div>
+                <div style={styles.modalDatosBody}>
+                    <div style={styles.datosForm}>
+                        <label>Nombre:</label>
+                        <input 
+                            style={styles.input} 
+                            value={datosNino.nombre || ''} 
+                            onChange={(e) => onChange({...datosNino, nombre: e.target.value})} 
+                        />
+                        
+                        <label>Fecha de Nacimiento:</label>
+                        <input 
+                            style={styles.input} 
+                            type="date" 
+                            value={datosNino.f_nac || ''} 
+                            onChange={(e) => onChange({...datosNino, f_nac: e.target.value})} 
+                        />
+                        
+                        <label>Género:</label>
+                        <select 
+                            style={styles.input} 
+                            value={datosNino.genero || 'M'} 
+                            onChange={(e) => onChange({...datosNino, genero: e.target.value})}
+                        >
+                            <option value="M">Masculino</option>
+                            <option value="F">Femenino</option>
+                        </select>
+                        
+                        <label>Escolaridad:</label>
+                        <select 
+                            style={styles.input} 
+                            value={datosNino.escolaridad || 'Inicial'} 
+                            onChange={(e) => onChange({...datosNino, escolaridad: e.target.value})}
+                        >
+                            <option value="Inicial">Inicial</option>
+                            <option value="Primaria">Primaria</option>
+                            <option value="Secundaria">Secundaria</option>
+                        </select>
+                        
+                        <label>Parentesco:</label>
+                        <select 
+                            style={styles.input} 
+                            value={datosNino.parentesco || 'Padre/Madre'} 
+                            onChange={(e) => onChange({...datosNino, parentesco: e.target.value})}
+                        >
+                            <option value="Padre/Madre">Padre/Madre</option>
+                            <option value="Abuelo/a">Abuelo/a</option>
+                            <option value="Tío/a">Tío/a</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                        
+                        <label>Usuario:</label>
+                        <input 
+                            style={styles.input} 
+                            value={datosNino.username || ''} 
+                            readOnly 
+                        />
+                    </div>
+                </div>
+                <div style={styles.modalDatosFooter}>
+                    <button style={styles.cancelButton} onClick={onClose}>Cancelar</button>
+                    <button style={styles.saveButton} onClick={onSave}>Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export default TutorDashboard;

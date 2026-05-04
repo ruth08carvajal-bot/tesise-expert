@@ -17,7 +17,6 @@ const NinoDashboard = ({ usuario, onLogout, onVerJuegos }) => {
     const [mostrarCelebracion, setMostrarCelebracion] = useState(false);
     const [nivelDesbloqueado, setNivelDesbloqueado] = useState(null);
     const [ejerciciosPorNivel, setEjerciciosPorNivel] = useState({});
-    const [imagenPerfil, setImagenPerfil] = useState(null);
 
     const nivelesConfig = [
         { id: 1, nombre: "🌱 Nivel 1", titulo: "Sonidos Básicos", icono: "🎤", color: "#27ae60", ejerciciosEsperados: 3 },
@@ -86,14 +85,6 @@ const NinoDashboard = ({ usuario, onLogout, onVerJuegos }) => {
                     const totalActual = ejerciciosNivelActual.length;
                     const progreso = totalActual > 0 ? (completadosActual / totalActual) * 100 : 0;
                     setProgresoNivel(progreso);
-                }
-                
-                if (usuario.genero === 'niño') {
-                    setImagenPerfil('/images/nino_default.png');
-                } else if (usuario.genero === 'niña') {
-                    setImagenPerfil('/images/niña_default.png');
-                } else {
-                    setImagenPerfil('/images/avatar_default.png');
                 }
                 
             } catch (err) {
@@ -239,27 +230,9 @@ const NinoDashboard = ({ usuario, onLogout, onVerJuegos }) => {
                 {/* Cabecera - Avatar grande en esquina superior izquierda */}
                 <div style={styles.header}>
                     <div style={styles.avatarContainer}>
-                        {imagenPerfil ? (
-                            <img src={imagenPerfil} alt="avatar" style={styles.avatarImagen} />
-                        ) : (
-                            <div style={styles.avatarEmoji}>
-                                {usuario.genero === 'niño' ? '👦' : usuario.genero === 'niña' ? '👧' : '🎮'}
-                            </div>
-                        )}
-                        <label style={styles.cambiarImagenBtn}>
-                            📷
-                            <input 
-                                type="file" 
-                                accept="image/*" 
-                                style={{ display: 'none' }}
-                                onChange={(e) => {
-                                    if (e.target.files[0]) {
-                                        const url = URL.createObjectURL(e.target.files[0]);
-                                        setImagenPerfil(url);
-                                    }
-                                }}
-                            />
-                        </label>
+                        <div style={styles.avatarEmoji}>
+                            {usuario.genero === 'M' ? '👦' : '👧'}
+                        </div>
                     </div>
                     
                     <div style={styles.userInfo}>
@@ -496,40 +469,19 @@ const styles = {
     },
     avatarContainer: { 
         position: 'relative',
-        width: '70px',
-        height: '70px'
-    },
-    avatarImagen: { 
-        width: '70px', 
-        height: '70px', 
-        borderRadius: '50%', 
-        objectFit: 'cover', 
-        border: '3px solid #f39c12',
-        backgroundColor: '#fff'
-    },
-    avatarEmoji: { 
-        fontSize: '60px',
-        width: '70px',
-        height: '70px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    cambiarImagenBtn: {
-        position: 'absolute',
-        bottom: '0',
-        right: '0',
-        backgroundColor: '#3498db',
-        borderRadius: '50%',
-        width: '26px',
-        height: '26px',
+        width: '120px',
+        height: '120px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        cursor: 'pointer',
-        fontSize: '12px',
-        border: '2px solid white',
-        color: 'white'
+        borderRadius: '50%',
+        backgroundColor: '#f8f9fa',
+        border: '4px solid #f39c12',
+        marginRight: '20px'
+    },
+    avatarEmoji: { 
+        fontSize: '80px',
+        lineHeight: '1'
     },
     userInfo: { flex: 1 },
     greeting: { fontSize: '18px', color: '#2c3e50', margin: 0 },

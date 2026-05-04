@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from models.conexion_db import db_admin
-from schemas import NinoSchema
+from schemas import NinoSchema, NinoUpdateSchema
+from pydantic import BaseModel
 from datetime import date, datetime
 from utils.logger import get_logger
 import traceback
@@ -17,6 +18,18 @@ def calcular_edad(fecha_nacimiento):
         fecha_nacimiento = datetime.strptime(fecha_nacimiento, '%Y-%m-%d').date()
     today = date.today()
     return today.year - fecha_nacimiento.year - ((today.month, today.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
+
+
+def generar_usuario_unico(cursor, nombre_base: str) -> str:
+    username = nombre_base.strip().lower().replace(' ', '.')
+    contador = 1
+    original_username = username
+    while True:
+        cursor.execute("SELECT id_user FROM usuario WHERE usr = %s", (username,))
+        if not cursor.fetchone():
+            return username
+        username = f"{original_username}_{contador}"
+        contador += 1
 
 
 # =========================================================
@@ -61,13 +74,15 @@ async def registrar_nino(nino: NinoSchema):
                     detail=f"Ya existe un niño con el nombre '{nino.nombre}' para este tutor."
                 )
             
-            # Crear usuario para el niño
+            # Crear usuario para el niño con nombre de usuario único
             password = fecha_nac.strftime('%d/%m/%Y')
+            usuario_unico = generar_usuario_unico(cursor, nino.nombre)
+            logger.info(f"Usuario generado: {usuario_unico}")
             logger.info(f"Contraseña generada: {password}")
             
             cursor.execute(
                 'INSERT INTO usuario (usr, psw, id_rol, estado) VALUES (%s, %s, 3, "activo")', 
-                (nino.nombre, password)
+                (usuario_unico, password)
             )
             id_user = cursor.lastrowid
             logger.info(f"Usuario creado con ID: {id_user}")
@@ -83,8 +98,15 @@ async def registrar_nino(nino: NinoSchema):
             ))
             conn.commit()
             
-            logger.info(f"Niño registrado exitosamente con ID: {cursor.lastrowid}")
-            return {"status": "success", "id_nino": cursor.lastrowid}
+            id_nino_creado = cursor.lastrowid
+            logger.info(f"Niño creado con ID: {id_nino_creado}")
+            
+            return {
+                "status": "success",
+                "id_nino": id_nino_creado,
+                "username": usuario_unico,
+                "password": password
+            }
             
     except HTTPException:
         raise
@@ -92,6 +114,46 @@ async def registrar_nino(nino: NinoSchema):
         logger.error(f"Error registrando niño: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+
+class SimpleTestSchema(BaseModel):
+    test: str
+
+class NinoUpdateSchemaInline(BaseModel):
+    nombre: str
+    f_nac: str
+    genero: str
+    escolaridad: str
+    parentesco: str
+
+class NinoUpdateSchemaInline(BaseModel):
+    nombre: str
+    f_nac: str
+    genero: str
+    escolaridad: str
+    parentesco: str
+
+class TwoFieldSchema(BaseModel):
+    nombre: str
+    f_nac: str
+
+class ThreeFieldSchema(BaseModel):
+    nombre: str
+    f_nac: str
+    genero: str
+
+class FourFieldSchema(BaseModel):
+    nombre: str
+    f_nac: str
+    genero: str
+    escolaridad: str
+
+class FiveFieldSchema(BaseModel):
+    nombre: str
+    f_nac: str
+    genero: str
+    escolaridad: str
+    parentesco: str
 
 
 # =========================================================
@@ -162,9 +224,68 @@ async def listar_ninos(id_tut: int):
 async def obtener_nino(id_nino: int):
     with db_admin.obtener_conexion() as conn:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id_nino, nombre, f_nac FROM nino WHERE id_nino = %s", (id_nino,))
+        cursor.execute(
+            "SELECT n.id_nino, n.nombre, n.f_nac, n.genero, n.escolaridad, n.parentesco, u.usr AS username, u.psw AS password "
+            "FROM nino n JOIN usuario u ON n.id_user = u.id_user WHERE n.id_nino = %s",
+            (id_nino,)
+        )
         nino = cursor.fetchone()
         if not nino:
             raise HTTPException(status_code=404, detail="Niño no encontrado")
         nino['edad'] = calcular_edad(nino['f_nac'])
         return nino
+
+
+# =========================================================
+@router.put("/actualizar-nino/{id_nino}")
+async def actualizar_nino(id_nino: int, datos: NinoUpdateSchema):
+    try:
+        logger.info(f"Actualizando niño {id_nino} con datos: {datos}")
+        fecha_nac = datetime.strptime(datos.f_nac, '%Y-%m-%d').date()
+        edad = calcular_edad(fecha_nac)
+        logger.info(f"Edad calculada al actualizar: {edad} años")
+        if edad < 5 or edad > 10:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El niño debe tener entre 5 y 10 años. Edad actual: {edad} años."
+            )
+
+        with db_admin.obtener_conexion() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT id_tut FROM nino WHERE id_nino = %s", (id_nino,))
+            nino_existente = cursor.fetchone()
+            if not nino_existente:
+                raise HTTPException(status_code=404, detail="Niño no encontrado")
+
+            id_tut = nino_existente['id_tut']
+            cursor.execute(
+                "SELECT id_nino FROM nino WHERE nombre = %s AND id_tut = %s AND id_nino != %s",
+                (datos.nombre, id_tut, id_nino)
+            )
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail=f"Ya existe otro niño con el nombre '{datos.nombre}' para este tutor.")
+
+            cursor.execute(
+                "UPDATE nino SET nombre=%s, f_nac=%s, genero=%s, escolaridad=%s, parentesco=%s WHERE id_nino=%s",
+                (datos.nombre, fecha_nac, datos.genero, datos.escolaridad, datos.parentesco, id_nino)
+            )
+            conn.commit()
+            logger.info(f"Niño {id_nino} actualizado en la BD exitosamente")
+
+            cursor.execute(
+                "SELECT u.usr as username, u.psw as password FROM nino n JOIN usuario u ON n.id_user = u.id_user WHERE n.id_nino = %s",
+                (id_nino,)
+            )
+            credenciales = cursor.fetchone()
+            return {
+                "status": "success",
+                "id_nino": id_nino,
+                "username": credenciales['username'],
+                "password": credenciales['password']
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando niño: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")

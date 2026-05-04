@@ -4147,3 +4147,194 @@ mysql.connector.errors.IntegrityError: 1062 (23000): Duplicate entry 'Maria ' fo
 2026-05-01 15:41:06,833 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
 2026-05-01 15:41:06,848 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
 2026-05-01 15:41:06,858 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,025 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,074 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,131 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,177 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,214 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,238 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,267 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,290 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,603 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,631 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,663 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,676 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,712 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,733 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,760 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:40,777 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:57,196 - controllers.login_controller - INFO - ==================================================
+2026-05-03 20:38:57,196 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 20:38:57,196 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-05-03 20:38:57,196 - controllers.login_controller - INFO - Password: 0000
+2026-05-03 20:38:57,196 - controllers.login_controller - INFO - ==================================================
+2026-05-03 20:38:57,220 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-05-03 20:38:57,220 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:57,276 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:38:57,303 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:39:05,235 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:39:18,601 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 20:55:13,861 - controllers.login_controller - INFO - ==================================================
+2026-05-03 20:55:13,861 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 20:55:13,861 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-05-03 20:55:13,861 - controllers.login_controller - INFO - Password: 0000
+2026-05-03 20:55:13,861 - controllers.login_controller - INFO - ==================================================
+2026-05-03 20:55:17,935 - models.conexion_db - ERROR - Error crítico de base de datos: 2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (10061)
+2026-05-03 20:55:17,935 - controllers.login_controller - ERROR - Error en login: 2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (10061)
+2026-05-03 20:55:17,938 - controllers.login_controller - ERROR - Traceback (most recent call last):
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on 'localhost:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\controllers\login_controller.py", line 20, in login
+    with db_admin.obtener_conexion() as conn:
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\models\conexion_db.py", line 24, in obtener_conexion
+    conexion = mysql.connector.connect(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (10061)
+
+2026-05-03 20:56:54,134 - controllers.login_controller - INFO - ==================================================
+2026-05-03 20:56:54,134 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 20:56:54,134 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-05-03 20:56:54,134 - controllers.login_controller - INFO - Password: 0000
+2026-05-03 20:56:54,134 - controllers.login_controller - INFO - ==================================================
+2026-05-03 20:56:58,217 - models.conexion_db - ERROR - Error crítico de base de datos: 2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (10061)
+2026-05-03 20:56:58,217 - controllers.login_controller - ERROR - Error en login: 2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (10061)
+2026-05-03 20:56:58,217 - controllers.login_controller - ERROR - Traceback (most recent call last):
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on 'localhost:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\controllers\login_controller.py", line 20, in login
+    with db_admin.obtener_conexion() as conn:
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\models\conexion_db.py", line 24, in obtener_conexion
+    conexion = mysql.connector.connect(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (10061)
+
+2026-05-03 21:00:51,136 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:00:51,138 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:00:51,138 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-05-03 21:00:51,138 - controllers.login_controller - INFO - Password: 0000
+2026-05-03 21:00:51,138 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:00:51,222 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-05-03 21:00:51,239 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:00:51,311 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:00:51,338 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:00:54,452 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:02:57,048 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:02:57,048 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:02:57,048 - controllers.login_controller - INFO - Username: jose.alcazar
+2026-05-03 21:02:57,048 - controllers.login_controller - INFO - Password: 0000
+2026-05-03 21:02:57,048 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:02:57,078 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 9, 'usr': 'jose.alcazar', 'id_rol': 2, 'estado': 'activo'}
+2026-05-03 21:02:57,081 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:02:57,146 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:02:57,172 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:03:32,560 - controllers.ninos_controller - INFO - ==================================================
+2026-05-03 21:03:32,561 - controllers.ninos_controller - INFO - DATOS RECIBIDOS EN EL BACKEND:
+2026-05-03 21:03:32,561 - controllers.ninos_controller - INFO - nombre: Paul
+2026-05-03 21:03:32,561 - controllers.ninos_controller - INFO - id_tut: 2
+2026-05-03 21:03:32,562 - controllers.ninos_controller - INFO - f_nac: 2021-02-05 (tipo: <class 'str'>)
+2026-05-03 21:03:32,562 - controllers.ninos_controller - INFO - genero: M
+2026-05-03 21:03:32,562 - controllers.ninos_controller - INFO - escolaridad: Inicial
+2026-05-03 21:03:32,563 - controllers.ninos_controller - INFO - parentesco: Tío/a
+2026-05-03 21:03:32,565 - controllers.ninos_controller - INFO - ==================================================
+2026-05-03 21:03:32,584 - controllers.ninos_controller - INFO - Fecha convertida: 2021-02-05
+2026-05-03 21:03:32,626 - controllers.ninos_controller - INFO - Edad calculada: 5 años
+2026-05-03 21:03:32,628 - controllers.ninos_controller - INFO - Usuario generado: paul_2
+2026-05-03 21:03:32,628 - controllers.ninos_controller - INFO - Contraseña generada: 05/02/2021
+2026-05-03 21:03:32,630 - controllers.ninos_controller - INFO - Usuario creado con ID: 67
+2026-05-03 21:03:32,633 - controllers.ninos_controller - INFO - Niño creado con ID: 30
+2026-05-03 21:03:32,634 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:03:32,676 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:03:42,707 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:03:55,183 - controllers.ninos_controller - INFO - Actualizando niño 30 con datos: nombre='Paul' f_nac='2022-02-05' genero='M' escolaridad='Inicial' parentesco='Tío/a'
+2026-05-03 21:06:21,381 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:27:36,432 - controllers.ninos_controller - INFO - Actualizando niño 30 con datos: nombre='Paul' f_nac='2022-02-05' genero='M' escolaridad='Inicial' parentesco='Padre/Madre'
+2026-05-03 21:27:36,497 - controllers.ninos_controller - INFO - Niño 30 actualizado en la BD exitosamente
+2026-05-03 21:27:36,505 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:28:20,155 - controllers.ninos_controller - INFO - Actualizando niño 30 con datos: nombre='Paul' f_nac='2019-02-05' genero='M' escolaridad='Inicial' parentesco='Tío/a'
+2026-05-03 21:28:20,211 - controllers.ninos_controller - INFO - Niño 30 actualizado en la BD exitosamente
+2026-05-03 21:28:20,211 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:28:20,276 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:28:27,358 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:28:50,777 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:28:50,777 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:28:50,779 - controllers.login_controller - INFO - Username: Paul
+2026-05-03 21:28:50,779 - controllers.login_controller - INFO - Password: 05/02/2019
+2026-05-03 21:28:50,779 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:28:50,824 - controllers.login_controller - INFO - Usuario encontrado: None
+2026-05-03 21:28:50,824 - controllers.login_controller - WARNING - Login fallido - Credenciales incorrectas para: Paul
+2026-05-03 21:28:50,826 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:29:01,053 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:29:01,055 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:29:01,055 - controllers.login_controller - INFO - Username: Paul
+2026-05-03 21:29:01,057 - controllers.login_controller - INFO - Password: 05/02/2019
+2026-05-03 21:29:01,057 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:29:01,087 - controllers.login_controller - INFO - Usuario encontrado: None
+2026-05-03 21:29:01,087 - controllers.login_controller - WARNING - Login fallido - Credenciales incorrectas para: Paul
+2026-05-03 21:29:01,087 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:29:15,300 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:29:15,300 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:29:15,302 - controllers.login_controller - INFO - Username: Paul
+2026-05-03 21:29:15,303 - controllers.login_controller - INFO - Password: 05/02/2019
+2026-05-03 21:29:15,304 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:29:15,337 - controllers.login_controller - INFO - Usuario encontrado: None
+2026-05-03 21:29:15,337 - controllers.login_controller - WARNING - Login fallido - Credenciales incorrectas para: Paul
+2026-05-03 21:29:15,337 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:29:25,017 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:29:25,017 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:29:25,017 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-05-03 21:29:25,017 - controllers.login_controller - INFO - Password: 0000
+2026-05-03 21:29:25,017 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:29:25,065 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-05-03 21:29:25,065 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:29:25,141 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:29:25,188 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:29:29,638 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:48,972 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:30:48,974 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-05-03 21:30:48,974 - controllers.login_controller - INFO - Username: paul_2
+2026-05-03 21:30:48,976 - controllers.login_controller - INFO - Password: 05/02/2021
+2026-05-03 21:30:48,980 - controllers.login_controller - INFO - ==================================================
+2026-05-03 21:30:49,014 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 67, 'usr': 'paul_2', 'id_rol': 3, 'estado': 'activo'}
+2026-05-03 21:30:49,016 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,169 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,213 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,266 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,299 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,346 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,381 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,430 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-05-03 21:30:49,468 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.

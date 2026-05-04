@@ -18,3 +18,21 @@ export const obtenerNinos = async (id_tut) => {
         throw error.response ? error.response.data.detail : "Error al obtener niños";
     }
 };
+
+export const obtenerDatosNino = async (id_nino) => {
+    try {
+        const response = await axios.get(`${API_ENDPOINTS.ninos}/nino/${id_nino}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data.detail : "Error al obtener datos del niño";
+    }
+};
+
+export const actualizarNino = async (id_nino, datos) => {
+    try {
+        const response = await axios.put(`${API_ENDPOINTS.ninos}/actualizar-nino/${id_nino}`, datos);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data.detail : "Error al actualizar datos del niño";
+    }
+};

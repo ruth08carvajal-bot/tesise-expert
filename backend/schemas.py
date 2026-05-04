@@ -19,6 +19,16 @@ class NinoSchema(BaseModel):
     escolaridad: str = Field(..., min_length=1)
     parentesco: str = Field(..., min_length=1)
 
+class NinoUpdateSchema(BaseModel):
+    nombre: str
+    f_nac: str
+    genero: str
+    escolaridad: str
+    parentesco: str
+
+    class Config:
+        extra = 'ignore'  # Ignorar campos adicionales
+
 class AnamnesisSchema(BaseModel):
     id_nino: int = Field(..., gt=0)
     respuestas: dict  # JSON object with answers
