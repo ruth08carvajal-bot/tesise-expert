@@ -9,7 +9,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 @router.post("/login")
-async def login(datos: LoginSchema):
+def login(datos: LoginSchema):
     try:
         logger.info("=" * 50)
         logger.info("=== SOLICITUD DE LOGIN RECIBIDA ===")
