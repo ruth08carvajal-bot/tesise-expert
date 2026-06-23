@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-
-const API_URL_EVALUACION = 'http://127.0.0.1:8003/evaluacion';
-const API_URL_EJERCICIOS = 'http://127.0.0.1:8003/ejercicios';
+import { API_ENDPOINTS } from '../../config';
 
 const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) => {
     const [grabando, setGrabando] = useState(false);
@@ -18,7 +16,7 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
     useEffect(() => {
         const obtenerSesionPractica = async () => {
             try {
-                const response = await axios.get(`${API_URL_EJERCICIOS}/sesion-practica/${idNino}`);
+                const response = await axios.get(`${API_ENDPOINTS.ejercicios}/sesion-practica/${idNino}`);
                 if (response.data.status === 'success') {
                     setIdEvaluacionPractica(response.data.id_evaluacion);
                 }
@@ -60,7 +58,7 @@ const PracticaEjercicio = ({ ejercicio, idNino, onGuardarProgreso, onVolver }) =
                 const tiempoTranscurrido = Math.floor((Date.now() - tiempoInicio) / 1000);
 
                 try {
-                    const response = await axios.post(`${API_URL_EVALUACION}/evaluar-fonema`, formData, {
+                    const response = await axios.post(`${API_ENDPOINTS.evaluacion}/evaluar-fonema`, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
                     
@@ -371,21 +369,6 @@ const styles = {
         fontSize: '18px',
         cursor: 'pointer',
         fontWeight: 'bold'
-    },
-    stopButton: {
-        backgroundColor: '#e74c3c',
-        color: 'white',
-        border: 'none',
-        padding: '15px 30px',
-        borderRadius: '50px',
-        fontSize: '18px',
-        cursor: 'pointer',
-        fontWeight: 'bold'
-    },
-    preguntaSeleccion: {
-        fontSize: '18px',
-        marginBottom: '20px',
-        color: '#2c3e50'
     },
     stopButton: {
         backgroundColor: '#e74c3c',

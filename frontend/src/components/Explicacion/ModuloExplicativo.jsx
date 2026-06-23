@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import GlosarioModal from '../Glosario/GlosarioModal';
-
-const API_URL = 'http://127.0.0.1:8003/explicacion';
+import { API_ENDPOINTS } from '../../config';
 
 const ModuloExplicativo = ({ idNino, idEvaluacion, nombreNino, onClose }) => {
     const [pregunta, setPregunta] = useState('');
@@ -28,7 +27,7 @@ const ModuloExplicativo = ({ idNino, idEvaluacion, nombreNino, onClose }) => {
         setCargando(true);
 
         try {
-            const response = await axios.post(`${API_URL}/chat`, {
+            const response = await axios.post(`${API_ENDPOINTS.explicacion}/chat`, {
                 id_nino: idNino,
                 id_evaluacion: idEvaluacion,
                 mensaje: preguntaTexto
@@ -120,9 +119,9 @@ const ModuloExplicativo = ({ idNino, idEvaluacion, nombreNino, onClose }) => {
                         <div style={styles.sugerenciasContainer}>
                             <p style={styles.sugerenciasLabel}>💡 También puedes preguntar:</p>
                             <div style={styles.sugerenciasLista}>
-                                {sugerencias.map((sug, idx) => (
+                                {sugerencias.map((sug) => (
                                     <button
-                                        key={idx}
+                                        key={sug}
                                         style={styles.sugerenciaBoton}
                                         onClick={() => enviarPregunta(sug)}
                                     >
@@ -155,9 +154,9 @@ const ModuloExplicativo = ({ idNino, idEvaluacion, nombreNino, onClose }) => {
 
                     {/* Botones rápidos */}
                     <div style={styles.rapidosContainer}>
-                        {preguntasPredefinidas.map((p, idx) => (
+                        {preguntasPredefinidas.map((p) => (
                             <button
-                                key={idx}
+                                key={p}
                                 style={styles.rapidoBoton}
                                 onClick={() => enviarPregunta(p)}
                                 disabled={cargando}

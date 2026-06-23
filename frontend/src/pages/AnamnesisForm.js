@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config';
 
 const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
     const [preguntas, setPreguntas] = useState([]);
@@ -21,17 +22,13 @@ const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
             setLoading(true);
             setMensaje('');
 
-            console.log('Cargando preguntas para niño:', id_nino);
             try {
-                const response = await fetch(`http://127.0.0.1:8003/anamnesis/preguntas-anamnesis/${id_nino}`);
-                console.log('Response status:', response.status);
+                const response = await fetch(`${API_ENDPOINTS.anamnesis}/preguntas-anamnesis/${id_nino}`);
                 if (!response.ok) {
                     const errorBody = await response.text();
-                    console.error('Error body:', errorBody);
                     throw new Error(`HTTP ${response.status}: ${errorBody}`);
                 }
                 const data = await response.json();
-                console.log('Data received:', data);
                 setPreguntas(data.preguntas || []);
                 setEdad(data.edad_nino || 0);
                 setNombreNino(data.nombre_nino || nombre || 'Niño');
@@ -74,7 +71,7 @@ const AnamnesisForm = ({ id_nino, nombre, onFinish }) => {
         };
 
         try {
-            const response = await fetch('http://127.0.0.1:8003/anamnesis/guardar-anamnesis', {
+            const response = await fetch(`${API_ENDPOINTS.anamnesis}/guardar-anamnesis`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

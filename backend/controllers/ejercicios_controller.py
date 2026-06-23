@@ -283,8 +283,8 @@ async def obtener_ejercicios_por_nivel(id_nino: int):
                             'rendimiento': rendimiento,
                             'nivel': ej.get('nivel_dificultad', 'Bajo')
                         })
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Error obteniendo rendimiento para hecho {id_hecho}: {str(e)}")
         
         # Calcular estadísticas por nivel
         if ejercicios_con_rendimiento:
@@ -323,8 +323,8 @@ async def obtener_ejercicios_por_nivel(id_nino: int):
             if id_hecho and not bloqueado:
                 try:
                     rendimiento = obtener_rendimiento_hecho(id_nino, id_hecho)
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Error obteniendo rendimiento para hecho {id_hecho}: {str(e)}")
             
             ejercicios_filtrados.append({
                 "id_ejercicio": ej.get('id_ejercicio'),

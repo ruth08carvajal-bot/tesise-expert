@@ -116,46 +116,6 @@ async def registrar_nino(nino: NinoSchema):
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
-class SimpleTestSchema(BaseModel):
-    test: str
-
-class NinoUpdateSchemaInline(BaseModel):
-    nombre: str
-    f_nac: str
-    genero: str
-    escolaridad: str
-    parentesco: str
-
-class NinoUpdateSchemaInline(BaseModel):
-    nombre: str
-    f_nac: str
-    genero: str
-    escolaridad: str
-    parentesco: str
-
-class TwoFieldSchema(BaseModel):
-    nombre: str
-    f_nac: str
-
-class ThreeFieldSchema(BaseModel):
-    nombre: str
-    f_nac: str
-    genero: str
-
-class FourFieldSchema(BaseModel):
-    nombre: str
-    f_nac: str
-    genero: str
-    escolaridad: str
-
-class FiveFieldSchema(BaseModel):
-    nombre: str
-    f_nac: str
-    genero: str
-    escolaridad: str
-    parentesco: str
-
-
 # =========================================================
 # LISTAR NIÑOS DE UN TUTOR
 # =========================================================

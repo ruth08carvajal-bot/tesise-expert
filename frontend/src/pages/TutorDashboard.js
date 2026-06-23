@@ -262,9 +262,9 @@ const TutorDashboard = ({ usuario, onLogout, onVerProgreso, onIniciarEvaluacion 
                         <p style={styles.selectorSubtitle}>Seleccione la evaluación que desea ver:</p>
                         
                         <div style={styles.evaluacionesList}>
-                            {evaluacionesDisponibles.map((evalItem, idx) => (
+                            {evaluacionesDisponibles.map((evalItem) => (
                                 <button
-                                    key={idx}
+                                    key={evalItem.id_ev}
                                     style={styles.evaluacionItem}
                                     onClick={() => handleSeleccionarEvaluacion(evalItem.id_ev)}
                                 >
@@ -898,13 +898,6 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         gap: '15px'
-    },
-    closeButton: {
-        background: 'none',
-        border: 'none',
-        fontSize: '20px',
-        cursor: 'pointer',
-        color: '#666'
     },
     cancelButton: {
         backgroundColor: '#6c757d',

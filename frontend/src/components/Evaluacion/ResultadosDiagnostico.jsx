@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { obtenerResultadosDiagnostico } from '../../api/evaluacionService';
+import { API_ENDPOINTS } from '../../config';
 import axios from 'axios';
 
 const ResultadosDiagnostico = ({ idNino, idEvaluacion, onBack }) => {
@@ -40,7 +41,7 @@ const ResultadosDiagnostico = ({ idNino, idEvaluacion, onBack }) => {
             formData.append('id_evaluacion', idEvaluacion);
             formData.append('notas', notas);
             
-            await axios.post('http://127.0.0.1:8003/evaluacion/agregar-notas', formData);
+            await axios.post(`${API_ENDPOINTS.evaluacion}/agregar-notas`, formData);
             alert('Notas guardadas correctamente');
         } catch (error) {
             console.error('Error guardando notas:', error);
@@ -112,7 +113,7 @@ const ResultadosDiagnostico = ({ idNino, idEvaluacion, onBack }) => {
                     <div style={styles.diagnosticosSection}>
                         {diagnosticosRelevantes.length > 0 ? (
                             diagnosticosRelevantes.map((diag, index) => (
-                                <div key={index} style={styles.diagnosticoCard}>
+                                <div key={`${diag.nombre_diag}-${index}`} style={styles.diagnosticoCard}>
                                     <div style={styles.diagnosticoHeader}>
                                         <h3 style={styles.diagnosticoName}>{diag.nombre_diag}</h3>
                                         <span style={styles.badge(diag.fc_total)}>
@@ -165,7 +166,7 @@ const ResultadosDiagnostico = ({ idNino, idEvaluacion, onBack }) => {
 
                     <div style={styles.actions}>
                         <button
-                            onClick={() => window.open(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${idEvaluacion}`, '_blank')}
+                            onClick={() => window.open(`${API_ENDPOINTS.evaluacion}/generar-reporte-pdf/${idNino}/${idEvaluacion}`, '_blank')}
                             style={styles.pdfButton}
                         >
                             📄 Generar Reporte PDF

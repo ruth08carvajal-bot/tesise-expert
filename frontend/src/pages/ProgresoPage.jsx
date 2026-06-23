@@ -299,8 +299,8 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                     {mejores_fonemas.length > 0 && (
                         <div style={styles.successCard}>
                             <h3>✅ Mejor rendimiento</h3>
-                            {mejores_fonemas.slice(0, 5).map((f, idx) => (
-                                <div key={idx} style={styles.fonemaRow}>
+                            {mejores_fonemas.slice(0, 5).map((f) => (
+                                <div key={f.descripcion} style={styles.fonemaRow}>
                                     <span>{f.descripcion}</span>
                                     <span style={styles.scoreGood}>{Math.round(f.promedio * 100)}%</span>
                                 </div>
@@ -311,8 +311,8 @@ const ProgresoPage = ({ idNino, nombreNino, onBack }) => {
                     {peores_fonemas.length > 0 && (
                         <div style={styles.dangerCard}>
                             <h3>🔴 Requieren refuerzo</h3>
-                            {peores_fonemas.slice(0, 5).map((f, idx) => (
-                                <div key={idx} style={styles.fonemaRow}>
+                            {peores_fonemas.slice(0, 5).map((f) => (
+                                <div key={f.descripcion} style={styles.fonemaRow}>
                                     <span>{f.descripcion}</span>
                                     <span style={styles.scoreBad}>{Math.round(f.promedio * 100)}%</span>
                                 </div>

@@ -14,7 +14,6 @@ def login(datos: LoginSchema):
         logger.info("=" * 50)
         logger.info("=== SOLICITUD DE LOGIN RECIBIDA ===")
         logger.info(f"Username: {datos.username}")
-        logger.info(f"Password: {datos.password}")
         logger.info("=" * 50)
         
         with db_admin.obtener_conexion() as conn:

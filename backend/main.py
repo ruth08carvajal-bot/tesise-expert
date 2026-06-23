@@ -27,9 +27,10 @@ app = FastAPI(
 )
 
 # --- CONFIGURACIÓN DE CORS ---
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Specific origins for security
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept"],
@@ -69,4 +70,12 @@ async def root():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8003, reload=True)
+    # Configuración del servidor desde variables de entorno
+    host = os.getenv("API_HOST", "0.0.0.0")  # 0.0.0.0 para acceso remoto, 127.0.0.1 solo local
+    port = int(os.getenv("API_PORT", "8003"))
+    environment = os.getenv("ENVIRONMENT", "development")  # 'development', 'production'
+    
+    # En producción, no activar reload
+    reload = environment != "production"
+    
+    uvicorn.run("main:app", host=host, port=port, reload=reload)

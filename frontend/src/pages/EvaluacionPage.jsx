@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import EvaluacionFonetica from '../components/Evaluacion/EvaluacionFonetica';
 import { iniciarEvaluacion } from '../api/evaluacionService';
+import { API_ENDPOINTS } from '../config';
 
 const EvaluacionPage = ({ idNino, onBack }) => {
     const [idEvaluacion, setIdEvaluacion] = useState(null);
@@ -19,7 +20,7 @@ const EvaluacionPage = ({ idNino, onBack }) => {
             try {
                 // Obtener nombre del niño
                 try {
-                    const ninoResponse = await fetch(`http://127.0.0.1:8003/ninos/nino/${idNino}`);
+                    const ninoResponse = await fetch(`${API_ENDPOINTS.ninos}/nino/${idNino}`);
                     if (ninoResponse.ok) {
                         const nino = await ninoResponse.json();
                         setNombreNino(nino.nombre);

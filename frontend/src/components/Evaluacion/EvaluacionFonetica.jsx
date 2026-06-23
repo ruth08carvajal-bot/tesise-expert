@@ -1,6 +1,7 @@
 // components/Evaluacion/EvaluacionFonetica.jsx
 import React, { useState, useEffect } from 'react';
-import { obtenerPlan, enviarAudioEvaluacion, enviarValorFuzzy, obtenerResultadosDiagnostico, generarReportePDF, obtenerDatosEvaluacion } from '../../api/evaluacionService';
+import { obtenerPlan, enviarAudioEvaluacion, enviarValorFuzzy, obtenerResultadosDiagnostico } from '../../api/evaluacionService';
+import { API_ENDPOINTS } from '../../config';
 
 // =========================================================
 // RECURSOS Y CONFIGURACIÓN DE EJERCICIOS (TU DISEÑO ORIGINAL)
@@ -298,11 +299,7 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
     const ejecutarDiagnosticoYFinalizar = async () => {
         setFinalizando(true);
         try {
-            console.log("Ejecutando diagnóstico...");
-            
             const resultados = await obtenerResultadosDiagnostico(idNino, idEvaluacion);
-            
-            console.log("Diagnóstico completado:", resultados);
             
             setResultadosDiagnostico(resultados);
             setEvaluacionFinalizada(true);
@@ -379,7 +376,7 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
         setGenerandoPDF(true);
         try {
             // CAMBIO 1: Usar GET con los IDs en la URL
-            const response = await fetch(`http://127.0.0.1:8003/evaluacion/generar-reporte-pdf/${idNino}/${idEvaluacion}`, {
+            const response = await fetch(`${API_ENDPOINTS.evaluacion}/generar-reporte-pdf/${idNino}/${idEvaluacion}`, {
                 method: 'GET',  // CAMBIO 2: GET en lugar de POST
                 headers: {
                     'Content-Type': 'application/json',
@@ -458,7 +455,7 @@ const EvaluacionFonetica = ({ idNino, idEvaluacion, onFinish }) => {
                                 {resultadosDiagnostico.diagnosticos
                                     .filter(d => d.fc_total > 0.5)
                                     .map((d, idx) => (
-                                        <p key={idx} style={styles.diagnosticoItem}>
+                                        <p key={`${d.nombre_diag}-${idx}`} style={styles.diagnosticoItem}>
                                             • {d.nombre_diag} ({(d.fc_total * 100).toFixed(1)}% certeza)
                                         </p>
                                     ))}

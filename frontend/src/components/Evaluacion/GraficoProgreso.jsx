@@ -11,6 +11,7 @@ import {
     Tooltip,
     Legend
 } from 'chart.js';
+import { API_ENDPOINTS } from '../../config';
 
 ChartJS.register(
     CategoryScale,
@@ -22,8 +23,6 @@ ChartJS.register(
     Legend
 );
 
-const API_URL = 'http://127.0.0.1:8003/evaluacion';
-
 const GraficoProgreso = ({ idNino }) => {
     const [datosProgreso, setDatosProgreso] = useState(null);
     const [cargando, setCargando] = useState(true);
@@ -33,7 +32,7 @@ const GraficoProgreso = ({ idNino }) => {
         const obtenerProgreso = async () => {
             try {
                 // Obtener todas las evaluaciones del niño
-                const response = await axios.get(`${API_URL}/historial-evaluaciones/${idNino}`);
+                const response = await axios.get(`${API_ENDPOINTS.evaluacion}/historial-evaluaciones/${idNino}`);
                 if (response.data.status === 'success') {
                     setDatosProgreso(response.data);
                 }

@@ -8639,3 +8639,108 @@ mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL serve
 2026-05-04 22:38:57,109 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
 2026-05-04 22:38:57,118 - controllers.evaluacion_controller - INFO - Generando PDF para niño=19, evaluación=71
 2026-05-04 22:38:57,147 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 17:06:10,708 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 17:06:10,761 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:01:32,189 - controllers.login_controller - INFO - ==================================================
+2026-06-22 19:01:32,194 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 19:01:32,195 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 19:01:32,196 - controllers.login_controller - INFO - Password: 0000
+2026-06-22 19:01:32,196 - controllers.login_controller - INFO - ==================================================
+2026-06-22 19:01:32,296 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-06-22 19:01:32,296 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:01:32,389 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:01:32,424 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:16:45,114 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:16:45,175 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:16:45,713 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:16:45,742 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:26:33,593 - controllers.login_controller - INFO - ==================================================
+2026-06-22 19:26:33,593 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 19:26:33,593 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 19:26:33,594 - controllers.login_controller - INFO - Password: 0000
+2026-06-22 19:26:33,594 - controllers.login_controller - INFO - ==================================================
+2026-06-22 19:26:33,620 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-06-22 19:26:33,620 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:26:33,696 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:26:33,731 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:39:49,466 - controllers.login_controller - INFO - ==================================================
+2026-06-22 19:39:49,466 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 19:39:49,466 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 19:39:49,466 - controllers.login_controller - INFO - Password: 0000
+2026-06-22 19:39:49,466 - controllers.login_controller - INFO - ==================================================
+2026-06-22 19:39:49,494 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-06-22 19:39:49,497 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:39:49,545 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:39:49,575 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:52:23,299 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:52:23,332 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:55:08,624 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 19:55:08,682 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:07:05,770 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:07:05,771 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 20:07:05,771 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 20:07:05,771 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:07:05,793 - controllers.login_controller - ERROR - Error en login: Failed raising error.
+2026-06-22 20:07:05,794 - controllers.login_controller - ERROR - Traceback (most recent call last):
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\controllers\login_controller.py", line 19, in login
+    with db_admin.obtener_conexion() as conn:
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\models\conexion_db.py", line 24, in obtener_conexion
+    conexion = mysql.connector.connect(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+RuntimeError: Failed raising error.
+
+2026-06-22 20:08:29,346 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:08:29,348 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 20:08:29,348 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 20:08:29,348 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:08:29,397 - controllers.login_controller - ERROR - Error en login: Failed raising error.
+2026-06-22 20:08:29,402 - controllers.login_controller - ERROR - Traceback (most recent call last):
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\controllers\login_controller.py", line 19, in login
+    with db_admin.obtener_conexion() as conn:
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\Documents\Proyectos React\tesise-expert\backend\models\conexion_db.py", line 24, in obtener_conexion
+    conexion = mysql.connector.connect(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\Yhorel Alvarez\AppData\Local\Programs\Python\Python311\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+RuntimeError: Failed raising error.
+
+2026-06-22 20:10:07,919 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:10:07,919 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 20:10:07,919 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 20:10:07,919 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:10:07,973 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-06-22 20:10:07,974 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:10:08,035 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:10:08,073 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:11:09,028 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:11:09,028 - controllers.login_controller - INFO - === SOLICITUD DE LOGIN RECIBIDA ===
+2026-06-22 20:11:09,028 - controllers.login_controller - INFO - Username: valeria.espinoza
+2026-06-22 20:11:09,028 - controllers.login_controller - INFO - ==================================================
+2026-06-22 20:11:09,044 - controllers.login_controller - INFO - Usuario encontrado: {'id_user': 11, 'usr': 'valeria.espinoza', 'id_rol': 2, 'estado': 'activo'}
+2026-06-22 20:11:09,044 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:11:09,090 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:11:09,117 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:14:42,062 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.
+2026-06-22 20:14:42,116 - models.conexion_db - INFO - Conexión cerrada de forma segura por el gestor de contexto.

@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import { API_ENDPOINTS } from '../config';
 
 const GrabadorVoz = ({ idNino, idEvaluacion, fonemaObjetivo }) => {
     const [grabando, setGrabando] = useState(false);
     const [audioUrl, setAudioUrl] = useState(null);
     const [resultado, setResultado] = useState(null);
+    const [error, setError] = useState(null);
     const mediaRecorder = useRef(null);
     const chunks = useRef([]);
 
@@ -38,10 +40,12 @@ const GrabadorVoz = ({ idNino, idEvaluacion, fonemaObjetivo }) => {
         formData.append('audio', audioBlob, 'grabacion.wav');
 
         try {
-            const resp = await axios.post('http://localhost:8003/evaluacion/evaluar-fonema', formData);
+            const resp = await axios.post(`${API_ENDPOINTS.evaluacion}/evaluar-fonema`, formData);
             setResultado(resp.data);
+            setError(null);
         } catch (error) {
             console.error("Error al evaluar:", error);
+            setError('Error al evaluar el fonema. Por favor, intenta de nuevo.');
         }
     };
 
@@ -64,7 +68,7 @@ const GrabadorVoz = ({ idNino, idEvaluacion, fonemaObjetivo }) => {
                     <p><strong>Similitud:</strong> {(resultado.similitud_detectada * 100).toFixed(2)}%</p>
                     <h4>Diagnósticos encontrados:</h4>
                     {resultado.diagnosticos.map((d, index) => (
-                        <div key={index} style={{ background: '#f0f0f0', padding: '10px', marginBottom: '5px' }}>
+                        <div key={`${d.nombre_diag}-${index}`} style={{ background: '#f0f0f0', padding: '10px', marginBottom: '5px' }}>
                             <strong>{d.nombre_diag}</strong> (Certeza: {d.fc_total})
                         </div>
                     ))}

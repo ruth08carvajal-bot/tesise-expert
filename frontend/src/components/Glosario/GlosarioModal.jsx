@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-
-const API_URL = 'http://127.0.0.1:8003/glosario';
+import { API_ENDPOINTS } from '../../config';
 
 const GlosarioModal = ({ onClose }) => {
     const [terminos, setTerminos] = useState([]);
@@ -13,12 +12,11 @@ const GlosarioModal = ({ onClose }) => {
 
     useEffect(() => {
         cargarCategorias();
-        cargarTerminos();
     }, []);
 
     const cargarCategorias = async () => {
         try {
-            const response = await axios.get(`${API_URL}/categorias`);
+            const response = await axios.get(`${API_ENDPOINTS.glosario}/categorias`);
             if (response.data.status === 'success') {
                 setCategorias(response.data.categorias);
             }
@@ -27,10 +25,10 @@ const GlosarioModal = ({ onClose }) => {
         }
     };
 
-    const cargarTerminos = async () => {
+    const cargarTerminos = useCallback(async () => {
         setCargando(true);
         try {
-            let url = `${API_URL}/buscar`;
+            let url = `${API_ENDPOINTS.glosario}/buscar`;
             const params = new URLSearchParams();
             
             if (busqueda) {
@@ -53,7 +51,7 @@ const GlosarioModal = ({ onClose }) => {
         } finally {
             setCargando(false);
         }
-    };
+    }, [busqueda, categoriaSeleccionada]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -61,7 +59,7 @@ const GlosarioModal = ({ onClose }) => {
         }, 300);
         
         return () => clearTimeout(timer);
-    }, [busqueda, categoriaSeleccionada]);
+    }, [cargarTerminos]);
 
     const getCategoriaColor = (categoria) => {
         const colores = {
@@ -107,8 +105,8 @@ const GlosarioModal = ({ onClose }) => {
                         onChange={(e) => setCategoriaSeleccionada(e.target.value)}
                     >
                         <option value="">Todas las categorías</option>
-                        {categorias.map((cat, idx) => (
-                            <option key={idx} value={cat.categoria}>
+                        {categorias.map((cat) => (
+                            <option key={cat.categoria} value={cat.categoria}>
                                 {cat.categoria} ({cat.cantidad})
                             </option>
                         ))}

@@ -14,11 +14,6 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
         setError('');
         setCargando(true);
 
-        console.log("=== DATOS A ENVIAR ===");
-        console.log("Username:", username);
-        console.log("Password:", password);
-        console.log("Rol seleccionado:", rolSeleccionado);
-
         if (!username || !password) {
             setError("Por favor, complete todos los campos");
             setCargando(false);
@@ -26,9 +21,7 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
         }
 
         try {
-            console.log("Enviando petición a:", "http://localhost:8003/auth/login");
             const data = await login(username, password);
-            console.log("Respuesta recibida:", data);
             
             if (data.status === "success") {
                 localStorage.setItem('user', JSON.stringify(data.usuario));
@@ -37,9 +30,6 @@ const LoginPage = ({ onLoginSuccess, onGoToRegister }) => {
                 setError("Credenciales incorrectas");
             }
         } catch (err) {
-            console.error("ERROR COMPLETO:", err);
-            console.error("Response:", err.response);
-            console.error("Response data:", err.response?.data);
             setError(err.response?.data?.detail || "Error de conexión con el servidor");
         } finally {
             setCargando(false);
